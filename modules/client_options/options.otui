@@ -2,23 +2,25 @@ OptionCheckBox < CheckBox
   @onCheckChange: modules.client_options.setOption(self:getId(), self:isChecked())
   height: 16
 
+  $first:
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: parent.top
+
   $!first:
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
     margin-top: 2
 
 OptionScrollbar < HorizontalScrollBar
   step: 1
   @onValueChange: modules.client_options.setOption(self:getId(), self:getValue())
-  
-OptionPanel < Panel
-  layout:
-    type: verticalBox
-    
+
 MainWindow
   id: optionsWindow
   !text: tr('Options')
-  size: 490 500
-  $mobile:
-    size: 490 360
+  size: 480 340
 
   @onEnter: modules.client_options.hide()
   @onEscape: modules.client_options.hide()
@@ -36,13 +38,10 @@ MainWindow
     anchors.right: parent.right
     anchors.bottom: optionsTabBar.bottom
     margin-left: 10
-    margin-top: 3
 
   Button
     !text: tr('Ok')
     width: 64
     anchors.right: parent.right
     anchors.bottom: parent.bottom
-    @onClick: |
-      g_settings.save()
-      modules.client_options.hide()
+    @onClick: modules.client_options.hide()

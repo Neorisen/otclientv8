@@ -5,9 +5,6 @@ SkillButton < UIButton
   margin-bottom: 2
   &onClick: onSkillButtonClick
 
-SmallSkillButton < SkillButton
-  height: 14
-
 SkillNameLabel < GameLabel
   font: verdana-11px-monochrome
   anchors.left: parent.left
@@ -40,7 +37,6 @@ MiniWindow
   icon: /images/topbuttons/skills
   @onClose: modules.game_skills.onMiniWindowClose()
   &save: true
-  &autoOpen: false
 
   MiniWindowContents
     padding-left: 5
@@ -174,39 +170,3 @@ MiniWindow
         !text: tr('Fishing')
       SkillValueLabel
       SkillPercentPanel
-
-    SmallSkillButton
-      id: skillId7
-      SkillNameLabel
-        !text: tr('Critical Hit Chance')
-      SkillValueLabel
-
-    SmallSkillButton
-      id: skillId8
-      SkillNameLabel
-        !text: tr('Critical Hit Damage')
-      SkillValueLabel
-
-    SmallSkillButton
-      id: skillId9
-      SkillNameLabel
-        !text: tr('Life Leech Chance')
-      SkillValueLabel
-
-    SmallSkillButton
-      id: skillId10
-      SkillNameLabel
-        !text: tr('Life Leech Amount')
-      SkillValueLabel
-
-    SmallSkillButton
-      id: skillId11
-      SkillNameLabel
-        !text: tr('Mana Leech Chance')
-      SkillValueLabel
-
-    SmallSkillButton
-      id: skillId12
-      SkillNameLabel
-        !text: tr('Mana Leech Amount')
-      SkillValueLabel

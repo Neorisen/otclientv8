@@ -3,10 +3,6 @@ locale = {
   charset = "cp1252",
   languageName = "Português",
 
-  formatNumbers = true,
-  decimalSeperator = ',',
-  thousandsSeperator = '.',
-
   -- As traduções devem vir sempre em ordem alfabética.
   translation = {
     ["%d of experience per hour"] = "%d de experiência por hora",

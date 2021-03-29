@@ -1,7 +1,4 @@
 modalDialog = nil
-lastDialogChoices = 0
-lastDialogChoice = 0
-lastDialogAnswer = 0
 
 function init()
   g_ui.importStyle('modaldialog')
@@ -38,12 +35,16 @@ function onModalDialog(id, title, message, buttons, enterButton, escapeButton, c
   local messageLabel = modalDialog:getChildById('messageLabel')
   local choiceList = modalDialog:getChildById('choiceList')
   local choiceScrollbar = modalDialog:getChildById('choiceScrollBar')
-  local buttonsPanel = modalDialog:getChildById('buttonsPanel')
+  local buttonList = modalDialog:getChildById('buttonList')
 
   modalDialog:setText(title)
   messageLabel:setText(message)
 
-  local labelHeight
+  local horizontalPadding = modalDialog:getPaddingLeft() + modalDialog:getPaddingRight()
+  modalDialog:setWidth(math.min(modalDialog.maximumWidth, math.max(messageLabel:getWidth(), modalDialog.minimumWidth)))
+  messageLabel:setWidth(math.min(modalDialog.maximumWidth, math.max(messageLabel:getWidth(), modalDialog.minimumWidth)) - horizontalPadding)
+
+  local labelHeight = nil
   for i = 1, #choices do
     local choiceId = choices[i][1]
     local choiceName = choices[i][2]
@@ -56,33 +57,23 @@ function onModalDialog(id, title, message, buttons, enterButton, escapeButton, c
       labelHeight = label:getHeight()
     end
   end
-  if #choices > 0 then
-    if g_clock.millis() < lastDialogAnswer + 1000 and lastDialogChoices == #choices then
-      choiceList:focusChild(choiceList:getChildByIndex(lastDialogChoice))    
-    else
-      choiceList:focusChild(choiceList:getFirstChild())
-    end
-  end
+  choiceList:focusNextChild()
 
-  local buttonsWidth = 0
   for i = 1, #buttons do
     local buttonId = buttons[i][1]
     local buttonText = buttons[i][2]
 
-    local button = g_ui.createWidget('ModalButton', buttonsPanel)
+    local button = g_ui.createWidget('ModalButton', buttonList)
     button:setText(buttonText)
     button.onClick = function(self)
                        local focusedChoice = choiceList:getFocusedChild()
                        local choice = 0xFF
                        if focusedChoice then
                          choice = focusedChoice.choiceId
-                         lastDialogChoice = choiceList:getChildIndex(focusedChoice)
-                         lastDialogAnswer = g_clock.millis()
                        end
                        g_game.answerModalDialog(id, buttonId, choice)
                        destroyDialog()
                      end
-    buttonsWidth = buttonsWidth + button:getWidth() + button:getMarginLeft() + button:getMarginRight()
   end
 
   local additionalHeight = 0
@@ -93,23 +84,17 @@ function onModalDialog(id, title, message, buttons, enterButton, escapeButton, c
     additionalHeight = math.min(modalDialog.maximumChoices, math.max(modalDialog.minimumChoices, #choices)) * labelHeight
     additionalHeight = additionalHeight + choiceList:getPaddingTop() + choiceList:getPaddingBottom()
   end
+  modalDialog:setHeight(modalDialog:getHeight() + additionalHeight)
 
-  local horizontalPadding = modalDialog:getPaddingLeft() + modalDialog:getPaddingRight()
-  buttonsWidth = buttonsWidth + horizontalPadding
-  
-  local labelWidth = math.min(600, math.floor(message:len() * 1.5))
-  modalDialog:setWidth(math.min(modalDialog.maximumWidth, math.max(buttonsWidth, labelWidth, modalDialog.minimumWidth)))
-  messageLabel:setTextWrap(true)
-  
-  modalDialog:setHeight(90 + additionalHeight + messageLabel:getHeight())
+  addEvent(function()
+             modalDialog:setHeight(modalDialog:getHeight() + messageLabel:getHeight() - 14)
+           end)
 
   local enterFunc = function()
     local focusedChoice = choiceList:getFocusedChild()
     local choice = 0xFF
     if focusedChoice then
       choice = focusedChoice.choiceId
-      lastDialogChoice = choiceList:getChildIndex(focusedChoice)
-      lastDialogAnswer = g_clock.millis()
     end
     g_game.answerModalDialog(id, enterButton, choice)
     destroyDialog()
@@ -120,8 +105,6 @@ function onModalDialog(id, title, message, buttons, enterButton, escapeButton, c
     local choice = 0xFF
     if focusedChoice then
       choice = focusedChoice.choiceId
-      lastDialogChoice = choiceList:getChildIndex(focusedChoice)
-      lastDialogAnswer = g_clock.millis()
     end
     g_game.answerModalDialog(id, escapeButton, choice)
     destroyDialog()
@@ -131,6 +114,4 @@ function onModalDialog(id, title, message, buttons, enterButton, escapeButton, c
 
   modalDialog.onEnter = enterFunc
   modalDialog.onEscape = escapeFunc
-  
-  lastDialogChoices = #choices
 end

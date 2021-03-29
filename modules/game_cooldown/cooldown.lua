@@ -9,17 +9,13 @@ contentsPanel = nil
 cooldownPanel = nil
 lastPlayer = nil
 
-cooldown = {}
-cooldowns = {}
-groupCooldown = {}
-
 function init()
   connect(g_game, { onGameStart = online,
                     onSpellGroupCooldown = onSpellGroupCooldown,
                     onSpellCooldown = onSpellCooldown })
 
   cooldownButton = modules.client_topmenu.addRightGameToggleButton('cooldownButton', 
-    tr('Cooldowns'), '/images/topbuttons/cooldowns', toggle, false, 5)
+    tr('Cooldowns'), '/images/topbuttons/cooldowns', toggle)
   cooldownButton:setOn(true)
   cooldownButton:hide()
 
@@ -44,11 +40,6 @@ function terminate()
   disconnect(g_game, { onGameStart = online,
                        onSpellGroupCooldown = onSpellGroupCooldown,
                        onSpellCooldown = onSpellCooldown })
-                       
-  for key, val in pairs(cooldowns) do
-    removeCooldown(key)
-  end
-  cooldowns = {}
 
   cooldownWindow:destroy()
   cooldownButton:destroy()
@@ -116,7 +107,6 @@ function removeCooldown(progressRect)
     progressRect.icon:destroy()
     progressRect.icon = nil
   end
-  cooldowns[progressRect] = nil
   progressRect = nil
 end
 
@@ -132,7 +122,6 @@ function turnOffCooldown(progressRect)
   particle:fill('parent')
   scheduleEvent(function() particle:destroy() end, 1000) -- hack until onEffectEnd]]
 
-  cooldowns[progressRect] = nil
   progressRect = nil
 end
 
@@ -153,20 +142,11 @@ function updateCooldown(progressRect, duration)
     removeEvent(progressRect.event)
 
     progressRect.event = scheduleEvent(function() 
-      if not progressRect.callback then return end
       progressRect.callback[ProgressCallback.update]() 
     end, 100)
   else
     progressRect.callback[ProgressCallback.finish]()
   end
-end
-
-function isGroupCooldownIconActive(groupId)
-  return groupCooldown[groupId]
-end
-
-function isCooldownIconActive(iconId)
-  return cooldown[iconId]
 end
 
 function onSpellCooldown(iconId, duration)
@@ -192,11 +172,8 @@ function onSpellCooldown(iconId, duration)
   end
   local finishFunc = function()
     removeCooldown(progressRect)
-    cooldown[iconId] = false
   end
   initCooldown(progressRect, updateFunc, finishFunc)
-  cooldown[iconId] = true
-  cooldowns[progressRect] = true
 end
 
 function onSpellGroupCooldown(groupId, duration)
@@ -217,9 +194,7 @@ function onSpellGroupCooldown(groupId, duration)
     end
     local finishFunc = function()
       turnOffCooldown(progressRect)
-      groupCooldown[groupId] = false
     end
     initCooldown(progressRect, updateFunc, finishFunc)
-    groupCooldown[groupId] = true
   end
 end

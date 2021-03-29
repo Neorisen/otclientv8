@@ -1,21 +1,21 @@
 Icons = {}
-Icons[PlayerStates.Poison] = { tooltip = tr('You are poisoned'), path = '/images/game/states/poisoned', id = 'condition_poisoned' }
-Icons[PlayerStates.Burn] = { tooltip = tr('You are burning'), path = '/images/game/states/burning', id = 'condition_burning' }
-Icons[PlayerStates.Energy] = { tooltip = tr('You are electrified'), path = '/images/game/states/electrified', id = 'condition_electrified' }
-Icons[PlayerStates.Drunk] = { tooltip = tr('You are drunk'), path = '/images/game/states/drunk', id = 'condition_drunk' }
-Icons[PlayerStates.ManaShield] = { tooltip = tr('You are protected by a magic shield'), path = '/images/game/states/magic_shield', id = 'condition_magic_shield' }
-Icons[PlayerStates.Paralyze] = { tooltip = tr('You are paralysed'), path = '/images/game/states/slowed', id = 'condition_slowed' }
-Icons[PlayerStates.Haste] = { tooltip = tr('You are hasted'), path = '/images/game/states/haste', id = 'condition_haste' }
-Icons[PlayerStates.Swords] = { tooltip = tr('You may not logout during a fight'), path = '/images/game/states/logout_block', id = 'condition_logout_block' }
-Icons[PlayerStates.Drowning] = { tooltip = tr('You are drowning'), path = '/images/game/states/drowning', id = 'condition_drowning' }
-Icons[PlayerStates.Freezing] = { tooltip = tr('You are freezing'), path = '/images/game/states/freezing', id = 'condition_freezing' }
-Icons[PlayerStates.Dazzled] = { tooltip = tr('You are dazzled'), path = '/images/game/states/dazzled', id = 'condition_dazzled' }
-Icons[PlayerStates.Cursed] = { tooltip = tr('You are cursed'), path = '/images/game/states/cursed', id = 'condition_cursed' }
-Icons[PlayerStates.PartyBuff] = { tooltip = tr('You are strengthened'), path = '/images/game/states/strengthened', id = 'condition_strengthened' }
-Icons[PlayerStates.PzBlock] = { tooltip = tr('You may not logout or enter a protection zone'), path = '/images/game/states/protection_zone_block', id = 'condition_protection_zone_block' }
-Icons[PlayerStates.Pz] = { tooltip = tr('You are within a protection zone'), path = '/images/game/states/protection_zone', id = 'condition_protection_zone' }
-Icons[PlayerStates.Bleeding] = { tooltip = tr('You are bleeding'), path = '/images/game/states/bleeding', id = 'condition_bleeding' }
-Icons[PlayerStates.Hungry] = { tooltip = tr('You are hungry'), path = '/images/game/states/hungry', id = 'condition_hungry' }
+Icons[1] = { tooltip = tr('You are poisoned'), path = '/images/game/states/poisoned', id = 'condition_poisoned' }
+Icons[2] = { tooltip = tr('You are burning'), path = '/images/game/states/burning', id = 'condition_burning' }
+Icons[4] = { tooltip = tr('You are electrified'), path = '/images/game/states/electrified', id = 'condition_electrified' }
+Icons[8] = { tooltip = tr('You are drunk'), path = '/images/game/states/drunk', id = 'condition_drunk' }
+Icons[16] = { tooltip = tr('You are protected by a magic shield'), path = '/images/game/states/magic_shield', id = 'condition_magic_shield' }
+Icons[32] = { tooltip = tr('You are paralysed'), path = '/images/game/states/slowed', id = 'condition_slowed' }
+Icons[64] = { tooltip = tr('You are hasted'), path = '/images/game/states/haste', id = 'condition_haste' }
+Icons[128] = { tooltip = tr('You may not logout during a fight'), path = '/images/game/states/logout_block', id = 'condition_logout_block' }
+Icons[256] = { tooltip = tr('You are drowning'), path = '/images/game/states/drowning', id = 'condition_drowning' }
+Icons[512] = { tooltip = tr('You are freezing'), path = '/images/game/states/freezing', id = 'condition_freezing' }
+Icons[1024] = { tooltip = tr('You are dazzled'), path = '/images/game/states/dazzled', id = 'condition_dazzled' }
+Icons[2048] = { tooltip = tr('You are cursed'), path = '/images/game/states/cursed', id = 'condition_cursed' }
+Icons[4096] = { tooltip = tr('You are strengthened'), path = '/images/game/states/strengthened', id = 'condition_strengthened' }
+Icons[8192] = { tooltip = tr('You may not logout or enter a protection zone'), path = '/images/game/states/protection_zone_block', id = 'condition_protection_zone_block' }
+Icons[16384] = { tooltip = tr('You are within a protection zone'), path = '/images/game/states/protection_zone', id = 'condition_protection_zone' }
+Icons[32768] = { tooltip = tr('You are bleeding'), path = '/images/game/states/bleeding', id = 'condition_bleeding' }
+Icons[65536] = { tooltip = tr('You are hungry'), path = '/images/game/states/hungry', id = 'condition_hungry' }
 
 InventorySlotStyles = {
   [InventorySlotHead] = "HeadSlot",
@@ -34,228 +34,132 @@ inventoryWindow = nil
 inventoryPanel = nil
 inventoryButton = nil
 purseButton = nil
-
-combatControlsWindow = nil
 fightOffensiveBox = nil
 fightBalancedBox = nil
 fightDefensiveBox = nil
 chaseModeButton = nil
 safeFightButton = nil
-mountButton = nil
-fightModeRadioGroup = nil
-buttonPvp = nil
 
-soulLabel = nil
-capLabel = nil
-conditionPanel = nil
+healthBar = nil
+manaBar = nil
+experienceBar = nil
+healthTooltip = 'Posiadasz %d zycia z %d.'
+manaTooltip = 'Posiadasz %d many z %d.'
+experienceTooltip = 'Posiadasz %d%% do %d poziomu.'
+
 
 function init()
-  connect(LocalPlayer, {
-    onInventoryChange = onInventoryChange,
-    onBlessingsChange = onBlessingsChange
-  })
+  connect(LocalPlayer, { onInventoryChange = onInventoryChange,
+  					     onHealthChange = onHealthChange,
+                         onManaChange = onManaChange,
+                         onLevelChange = onLevelChange,
+                         onStatesChange = onStatesChange,
+                         onSoulChange = onSoulChange,
+                         onFreeCapacityChange = onFreeCapacityChange,
+                         onFightModeChange = update,
+                         onChaseModeChange = update,
+                         onSafeFightChange = update,
+                         onWalk = check,
+                         onAutoWalk = check})
   connect(g_game, { onGameStart = refresh })
-
+  connect(g_game, { onGameEnd = offline })
+  connect(g_game, { onGameStart = online })
   g_keyboard.bindKeyDown('Ctrl+I', toggle)
 
+  inventoryButton = modules.client_topmenu.addRightGameToggleButton('inventoryButton', tr('Inventory') .. ' (Ctrl+I)', '/images/topbuttons/inventory', toggle)
+  inventoryButton:setOn(true)
 
   inventoryWindow = g_ui.loadUI('inventory', modules.game_interface.getRightPanel())
   inventoryWindow:disableResize()
-  inventoryPanel = inventoryWindow:getChildById('contentsPanel'):getChildById('inventoryPanel')
-  if not inventoryWindow.forceOpen then
-    inventoryButton = modules.client_topmenu.addRightGameToggleButton('inventoryButton', tr('Inventory') .. ' (Ctrl+I)', '/images/topbuttons/inventory', toggle)
-    inventoryButton:setOn(true)
-  end
-  
-  purseButton = inventoryWindow:recursiveGetChildById('purseButton')
-  purseButton.onClick = function()
+  inventoryPanel = inventoryWindow:getChildById('contentsPanel')
+  healthBar = inventoryWindow:recursiveGetChildById('healthBar')
+  manaBar = inventoryWindow:recursiveGetChildById('manaBar')
+  experienceBar = inventoryWindow:recursiveGetChildById('experienceBar')
+
+  purseButton = inventoryPanel:getChildById('purseButton')
+  local function purseFunction()
     local purse = g_game.getLocalPlayer():getInventoryItem(InventorySlotPurse)
     if purse then
       g_game.use(purse)
     end
   end
+  purseButton.onClick = purseFunction
   
-  -- controls
+  fightModeRadioGroup = UIRadioGroup.create()
   fightOffensiveBox = inventoryWindow:recursiveGetChildById('fightOffensiveBox')
   fightBalancedBox = inventoryWindow:recursiveGetChildById('fightBalancedBox')
   fightDefensiveBox = inventoryWindow:recursiveGetChildById('fightDefensiveBox')
-
-  chaseModeButton = inventoryWindow:recursiveGetChildById('chaseModeBox')
-  safeFightButton = inventoryWindow:recursiveGetChildById('safeFightBox')
-  buttonPvp = inventoryWindow:recursiveGetChildById('buttonPvp')
-
-  mountButton = inventoryWindow:recursiveGetChildById('mountButton')
-  mountButton.onClick = onMountButtonClick
-
-  whiteDoveBox = inventoryWindow:recursiveGetChildById('whiteDoveBox')
-  whiteHandBox = inventoryWindow:recursiveGetChildById('whiteHandBox')
-  yellowHandBox = inventoryWindow:recursiveGetChildById('yellowHandBox')
-  redFistBox = inventoryWindow:recursiveGetChildById('redFistBox')
-
+  
+  
   fightModeRadioGroup = UIRadioGroup.create()
   fightModeRadioGroup:addWidget(fightOffensiveBox)
   fightModeRadioGroup:addWidget(fightBalancedBox)
   fightModeRadioGroup:addWidget(fightDefensiveBox)
 
-  connect(fightModeRadioGroup, { onSelectionChange = onSetFightMode })
+  
+  chaseModeButton = inventoryWindow:recursiveGetChildById('chaseModeBox')
+  safeFightButton = inventoryWindow:recursiveGetChildById('safeFightBox')
+
   connect(chaseModeButton, { onCheckChange = onSetChaseMode })
   connect(safeFightButton, { onCheckChange = onSetSafeFight })
-  if buttonPvp then
-    connect(buttonPvp, { onClick = onSetSafeFight2 })  
+  connect(fightModeRadioGroup, { onSelectionChange = onSetFightMode })
+
+
+  for k,v in pairs(Icons) do
+    g_textures.preload(v.path)
   end
-  connect(g_game, {
-    onGameStart = online,
-    onGameEnd = offline,
-    onFightModeChange = update,
-    onChaseModeChange = update,
-    onSafeFightChange = update,
-    onPVPModeChange   = update,
-    onWalk = check,
-    onAutoWalk = check
-  })
-
-  connect(LocalPlayer, { onOutfitChange = onOutfitChange })
-
-  if g_game.isOnline() then
-    online()
-  end
--- controls end
-
--- status
+  
   soulLabel = inventoryWindow:recursiveGetChildById('soulLabel')
   capLabel = inventoryWindow:recursiveGetChildById('capLabel')
   conditionPanel = inventoryWindow:recursiveGetChildById('conditionPanel')
 
 
-  connect(LocalPlayer, { onStatesChange = onStatesChange,
-                         onSoulChange = onSoulChange,
-                         onFreeCapacityChange = onFreeCapacityChange })
--- status end
-  
+  if g_game.isOnline() then
+    local localPlayer = g_game.getLocalPlayer()
+    onHealthChange(localPlayer, localPlayer:getHealth(), localPlayer:getMaxHealth())
+    onManaChange(localPlayer, localPlayer:getMana(), localPlayer:getMaxMana())
+    onLevelChange(localPlayer, localPlayer:getLevel(), localPlayer:getLevelPercent())
+    onStatesChange(localPlayer, localPlayer:getStates(), 0)
+    onSoulChange(localPlayer, localPlayer:getSoul())
+    onFreeCapacityChange(localPlayer, localPlayer:getFreeCapacity())
+  end
+
+
+
   refresh()
   inventoryWindow:setup()
 end
 
 function terminate()
   disconnect(LocalPlayer, {
+    onHealthChange = onHealthChange,
+    onManaChange = onManaChange,
+    onLevelChange = onLevelChange,
     onInventoryChange = onInventoryChange,
-    onBlessingsChange = onBlessingsChange
+	onStatesChange = onStatesChange,
+	onSoulChange = onSoulChange,
+    onFreeCapacityChange = onFreeCapacityChange
   })
-  disconnect(g_game, { onGameStart = refresh })
-
-  g_keyboard.unbindKeyDown('Ctrl+I')
-
-  -- controls
-  if g_game.isOnline() then
-    offline()
-  end
-
-  fightModeRadioGroup:destroy()
-  
   disconnect(g_game, {
-    onGameStart = online,
-    onGameEnd = offline,
+	onGameStart = refresh,
     onFightModeChange = update,
     onChaseModeChange = update,
     onSafeFightChange = update,
-    onPVPModeChange   = update,
     onWalk = check,
-    onAutoWalk = check
+    onAutoWalk = check,
+	onGameEnd = offline
   })
+  
 
-  disconnect(LocalPlayer, { onOutfitChange = onOutfitChange })
-  -- controls end
-  -- status
-  disconnect(LocalPlayer, { onStatesChange = onStatesChange,
-                         onSoulChange = onSoulChange,
-                         onFreeCapacityChange = onFreeCapacityChange })
-  -- status end
-
+  g_keyboard.unbindKeyDown('Ctrl+I')
+  
   inventoryWindow:destroy()
-  if inventoryButton then
-    inventoryButton:destroy()
-  end
+  inventoryButton:destroy()
+  fightModeRadioGroup:destroy()
 end
 
-function toggleAdventurerStyle(hasBlessing)
-  for slot = InventorySlotFirst, InventorySlotLast do
-    local itemWidget = inventoryPanel:getChildById('slot' .. slot)
-    if itemWidget then
-      itemWidget:setOn(hasBlessing)
-    end
-  end
-end
-
-function refresh()
-  local player = g_game.getLocalPlayer()
-  for i = InventorySlotFirst, InventorySlotPurse do
-    if g_game.isOnline() then
-      onInventoryChange(player, i, player:getInventoryItem(i))
-    else
-      onInventoryChange(player, i, nil)
-    end
-    toggleAdventurerStyle(player and Bit.hasBit(player:getBlessings(), Blessings.Adventurer) or false)
-  end
-  if player then
-    onSoulChange(player, player:getSoul())
-    onFreeCapacityChange(player, player:getFreeCapacity())
-    onStatesChange(player, player:getStates(), 0)
-  end
-
-  purseButton:setVisible(g_game.getFeature(GamePurseSlot))
-end
-
-function toggle()
-  if not inventoryButton then
-    return
-  end
-  if inventoryButton:isOn() then
-    inventoryWindow:close()
-    inventoryButton:setOn(false)
-  else
-    inventoryWindow:open()
-    inventoryButton:setOn(true)
-  end
-end
-
-function onMiniWindowClose()
-  if not inventoryButton then
-    return
-  end
-  inventoryButton:setOn(false)
-end
-
--- hooked events
-function onInventoryChange(player, slot, item, oldItem)
-  if slot > InventorySlotPurse then return end
-
-  if slot == InventorySlotPurse then
-    if g_game.getFeature(GamePurseSlot) then
-      --purseButton:setEnabled(item and true or false)
-    end
-    return
-  end
-
-  local itemWidget = inventoryPanel:getChildById('slot' .. slot)
-  if item then
-    itemWidget:setStyle('InventoryItem')
-    itemWidget:setItem(item)
-  else
-    itemWidget:setStyle(InventorySlotStyles[slot])
-    itemWidget:setItem(nil)
-  end
-end
-
-function onBlessingsChange(player, blessings, oldBlessings)
-  local hasAdventurerBlessing = Bit.hasBit(blessings, Blessings.Adventurer)
-  if hasAdventurerBlessing ~= Bit.hasBit(oldBlessings, Blessings.Adventurer) then
-    toggleAdventurerStyle(hasAdventurerBlessing)
-  end
-end
-
-
--- controls
 function update()
+
   local fightMode = g_game.getFightMode()
   if fightMode == FightOffensive then
     fightModeRadioGroup:selectWidget(fightOffensiveBox)
@@ -264,23 +168,71 @@ function update()
   else
     fightModeRadioGroup:selectWidget(fightDefensiveBox)
   end
-
+  
   local chaseMode = g_game.getChaseMode()
   chaseModeButton:setChecked(chaseMode == ChaseOpponent)
 
   local safeFight = g_game.isSafeFight()
   safeFightButton:setChecked(not safeFight)
-  if buttonPvp then
-    if safeFight then
-      buttonPvp:setOn(false)
-    else
-      buttonPvp:setOn(true)  
-    end
+end
+
+function onHealthChange(localPlayer, health, maxHealth)
+  healthBar:setText(health)
+  healthBar:setTooltip(tr(healthTooltip, health, maxHealth))
+  healthBar:setValue(health, 0, maxHealth)
+  local healthPercent2 = math.floor(100*health/maxHealth)
+  if (healthPercent2 >= 93) and (healthPercent2 < 101) then
+    healthBar:setBackgroundColor("#00BC00FF")
+  elseif (healthPercent2 >= 61) and (healthPercent2 < 93) then
+    healthBar:setBackgroundColor("#50A150FF")
+  elseif (healthPercent2 >= 31) and (healthPercent2 < 61) then
+    healthBar:setBackgroundColor("#A1A100FF")
+  elseif (healthPercent2 >= 9) and (healthPercent2 < 31) then
+    healthBar:setBackgroundColor("#BF0A0AFF")
+  elseif (healthPercent2 >= 4) and (healthPercent2 < 9) then
+    healthBar:setBackgroundColor("#910F0FFF")
+  elseif (healthPercent2 >= 2) and (healthPercent2 < 4) then
+    healthBar:setBackgroundColor("#850C0CFF")
+  elseif (healthPercent2 >= 1) and (healthPercent2 < 2) then
+    healthBar:setBackgroundColor("#660B0BFF")
   end
-  
-  if g_game.getFeature(GamePVPMode) then
-    local pvpMode = g_game.getPVPMode()
-    local pvpWidget = getPVPBoxByMode(pvpMode)
+end
+
+function onManaChange(localPlayer, mana, maxMana)
+  manaBar:setText(mana)
+  manaBar:setTooltip(tr(manaTooltip, mana, maxMana))
+  manaBar:setValue(mana, 0, maxMana)
+end
+
+function onLevelChange(localPlayer, value, percent)
+  experienceBar:setTooltip(tr(experienceTooltip, percent, value+1))
+  experienceBar:setPercent(percent)
+end
+
+function setHealthTooltip(tooltip)
+  healthTooltip = tooltip
+
+  local localPlayer = g_game.getLocalPlayer()
+  if localPlayer then
+    healthBar:setTooltip(tr(healthTooltip, localPlayer:getHealth(), localPlayer:getMaxHealth()))
+  end
+end
+
+function setManaTooltip(tooltip)
+  manaTooltip = tooltip
+
+  local localPlayer = g_game.getLocalPlayer()
+  if localPlayer then
+    manaBar:setTooltip(tr(manaTooltip, localPlayer:getMana(), localPlayer:getMaxMana()))
+  end
+end
+
+function setExperienceTooltip(tooltip)
+  experienceTooltip = tooltip
+
+  local localPlayer = g_game.getLocalPlayer()
+  if localPlayer then
+    experienceBar:setTooltip(tr(experienceTooltip, localPlayer:getLevelPercent(), localPlayer:getLevel()+1))
   end
 end
 
@@ -298,27 +250,109 @@ function online()
     local char = g_game.getCharacterName()
 
     local lastCombatControls = g_settings.getNode('LastCombatControls')
-
     if not table.empty(lastCombatControls) then
       if lastCombatControls[char] then
         g_game.setFightMode(lastCombatControls[char].fightMode)
         g_game.setChaseMode(lastCombatControls[char].chaseMode)
         g_game.setSafeFight(lastCombatControls[char].safeFight)
-        if lastCombatControls[char].pvpMode then
-          g_game.setPVPMode(lastCombatControls[char].pvpMode)
-        end
-      end
-    end
-
-    if g_game.getFeature(GamePlayerMounts) then
-      mountButton:setVisible(true)
-      mountButton:setChecked(player:isMounted())
-    else
-      mountButton:setVisible(false)
+      end  
     end
   end
 
   update()
+end
+
+function refresh()
+  local player = g_game.getLocalPlayer()
+  for i = InventorySlotFirst, InventorySlotPurse do
+    if g_game.isOnline() then
+      onInventoryChange(player, i, player:getInventoryItem(i))
+    else
+      onInventoryChange(player, i, nil)
+    end
+  if player then
+    onSoulChange(player, player:getSoul())
+    onFreeCapacityChange(player, player:getFreeCapacity())
+  end
+  end
+
+  purseButton:setVisible(g_game.getFeature(GamePurseSlot))
+end
+
+
+function toggle()
+  if inventoryButton:isOn() then
+    inventoryWindow:close()
+    inventoryButton:setOn(false)
+  else
+    inventoryWindow:open()
+    inventoryButton:setOn(true)
+  end
+end
+
+function onMiniWindowClose()
+  inventoryButton:setOn(false)
+end
+
+-- hooked events
+function onInventoryChange(player, slot, item, oldItem)
+  if slot > InventorySlotPurse then return end
+
+  if slot == InventorySlotPurse then
+    if g_game.getFeature(GamePurseSlot) then
+      purseButton:setEnabled(item and true or false)
+    end
+    return
+  end
+
+  local itemWidget = inventoryPanel:getChildById('slot' .. slot)
+  if item then
+    itemWidget:setStyle('Item')
+    itemWidget:setItem(item)
+  else
+    itemWidget:setStyle(InventorySlotStyles[slot])
+    itemWidget:setItem(nil)
+  end
+end
+
+-- status
+function toggleIcon(bitChanged)
+  local content = inventoryWindow:recursiveGetChildById('conditionPanel')
+  
+  local icon = content:getChildById(Icons[bitChanged].id)
+  if icon then
+    icon:destroy()
+  else
+    icon = loadIcon(bitChanged)
+    icon:setParent(content)
+  end
+end
+
+function loadIcon(bitChanged)
+  local icon = g_ui.createWidget('ConditionWidget', conditionPanel)
+  icon:setId(Icons[bitChanged].id)
+  icon:setImageSource(Icons[bitChanged].path)
+  icon:setTooltip(Icons[bitChanged].tooltip)
+  return icon
+end
+
+function onSoulChange(localPlayer, soul)
+  if not soul then return end
+  soulLabel:setText(tr('Soul') .. ':\n' .. soul)
+end
+
+function onFreeCapacityChange(player, freeCapacity)
+  if not freeCapacity then return end
+  if freeCapacity > 99 then
+    freeCapacity = math.floor(freeCapacity * 10) / 10
+  end
+  if freeCapacity > 999 then
+    freeCapacity = math.floor(freeCapacity)
+  end
+  if freeCapacity > 99999 then
+    freeCapacity = 99999
+  end
+  capLabel:setText(tr('Cap') .. ':\n' .. (freeCapacity * 100))
 end
 
 function offline()
@@ -326,8 +360,6 @@ function offline()
   if not lastCombatControls then
     lastCombatControls = {}
   end
-
-  conditionPanel:destroyChildren()
 
   local player = g_game.getLocalPlayer()
   if player then
@@ -337,13 +369,11 @@ function offline()
       chaseMode = g_game.getChaseMode(),
       safeFight = g_game.isSafeFight()
     }
-
-    if g_game.getFeature(GamePVPMode) then
-      lastCombatControls[char].pvpMode = g_game.getPVPMode()
-    end
-
+    
     -- save last combat control settings
     g_settings.setNode('LastCombatControls', lastCombatControls)
+    
+    inventoryWindow:recursiveGetChildById('conditionPanel'):destroyChildren()
   end
 end
 
@@ -373,105 +403,8 @@ end
 
 function onSetSafeFight(self, checked)
   g_game.setSafeFight(not checked)
-  if buttonPvp then
-    if not checked then
-      buttonPvp:setOn(false)
-    else
-      buttonPvp:setOn(true)  
-    end
-  end
 end
 
-function onSetSafeFight2(self)
-  onSetSafeFight(self, not safeFightButton:isChecked())
-end
-
-function onSetPVPMode(self, selectedPVPButton)
-  if selectedPVPButton == nil then
-    return
-  end
-
-  local buttonId = selectedPVPButton:getId()
-  local pvpMode = PVPWhiteDove
-  if buttonId == 'whiteDoveBox' then
-    pvpMode = PVPWhiteDove
-  elseif buttonId == 'whiteHandBox' then
-    pvpMode = PVPWhiteHand
-  elseif buttonId == 'yellowHandBox' then
-    pvpMode = PVPYellowHand
-  elseif buttonId == 'redFistBox' then
-    pvpMode = PVPRedFist
-  end
-
-  g_game.setPVPMode(pvpMode)
-end
-
-function onMountButtonClick(self, mousePos)
-  local player = g_game.getLocalPlayer()
-  if player then
-    player:toggleMount()
-  end
-end
-
-function onOutfitChange(localPlayer, outfit, oldOutfit)
-  if outfit.mount == oldOutfit.mount then
-    return
-  end
-
-  mountButton:setChecked(outfit.mount ~= nil and outfit.mount > 0)
-end
-
-function getPVPBoxByMode(mode)
-  local widget = nil
-  if mode == PVPWhiteDove then
-    widget = whiteDoveBox
-  elseif mode == PVPWhiteHand then
-    widget = whiteHandBox
-  elseif mode == PVPYellowHand then
-    widget = yellowHandBox
-  elseif mode == PVPRedFist then
-    widget = redFistBox
-  end
-  return widget
-end
-
--- status
-function toggleIcon(bitChanged)
-  local icon = conditionPanel:getChildById(Icons[bitChanged].id)
-  if icon then
-    icon:destroy()
-  else
-    icon = loadIcon(bitChanged)
-    icon:setParent(conditionPanel)
-  end
-end
-
-function loadIcon(bitChanged)
-  local icon = g_ui.createWidget('ConditionWidget', conditionPanel)
-  icon:setId(Icons[bitChanged].id)
-  icon:setImageSource(Icons[bitChanged].path)
-  icon:setTooltip(Icons[bitChanged].tooltip)
-  return icon
-end
-
-function onSoulChange(localPlayer, soul)
-  if not soul then return end
-  soulLabel:setText(tr('Soul') .. ':\n' .. soul)
-end
-
-function onFreeCapacityChange(player, freeCapacity)
-  if not freeCapacity then return end
-  if freeCapacity > 99 then
-    freeCapacity = math.floor(freeCapacity * 10) / 10
-  end
-  if freeCapacity > 999 then
-    freeCapacity = math.floor(freeCapacity)
-  end
-  if freeCapacity > 99999 then
-    freeCapacity = math.min(9999, math.floor(freeCapacity/1000)) .. "k"
-  end
-  capLabel:setText(tr('Cap') .. ':\n' .. freeCapacity)
-end
 
 function onStatesChange(localPlayer, now, old)
   if now == old then return end
@@ -485,3 +418,10 @@ function onStatesChange(localPlayer, now, old)
     end
   end
 end
+
+function hideExperience()
+  local removeHeight = experienceBar:getMarginRect().height
+  experienceBar:setOn(false)
+  inventoryWindow:setHeight(math.max(inventoryWindow.minimizedHeight, inventoryWindow:getHeight() - removeHeight))
+end
+

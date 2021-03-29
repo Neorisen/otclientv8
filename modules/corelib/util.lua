@@ -38,7 +38,7 @@ function exit()
 end
 
 function quit()
-  g_app.exit()
+  g_app.quit()
 end
 
 function connect(object, arg1, arg2, arg3)
@@ -152,6 +152,7 @@ function extends(base, name)
   derived.create = derived.internalCreate
   derived.__class = name
   derived.getClassName = function() return name end
+  derived.super = base
   return derived
 end
 
@@ -296,16 +297,6 @@ function numbertoboolean(number)
   end
 end
 
-function protectedcall(func, ...)
-  local status, ret = pcall(func, ...)
-  if status then
-    return ret
-  end
-
-  perror(ret)
-  return false
-end
-
 function signalcall(param, ...)
   if type(param) == 'function' then
     local status, ret = pcall(param, ...)
@@ -323,7 +314,7 @@ function signalcall(param, ...)
         perror(ret)
       end
     end
-  elseif param ~= nil then
+  elseif func ~= nil then
     error('attempt to call a non function value')
   end
   return false
@@ -360,17 +351,6 @@ function makesingleton(obj)
     end
   end
   return singleton
-end
-
-function comma_value(amount)
-  local formatted = amount
-  while true do  
-    formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
-    if (k==0) then
-      break
-    end
-  end
-  return formatted
 end
 
 -- @}

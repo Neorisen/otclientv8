@@ -8,8 +8,10 @@ function init()
   background:lower()
 
   clientVersionLabel = background:getChildById('clientVersionLabel')
-  clientVersionLabel:setText('OTClientV8 ' .. g_app.getVersion() .. '\nMade by:\n' .. g_app.getAuthor() .. "\notclient@otclient.ovh")
-  
+  clientVersionLabel:setText(g_app.getName() .. ' ' .. g_app.getVersion() .. '\n' ..
+                             'Rev  ' .. g_app.getBuildRevision() .. ' ('.. g_app.getBuildCommit() .. ')\n' ..
+                             'Built on ' .. g_app.getBuildDate())
+
   if not g_game.isOnline() then
     addEvent(function() g_effects.fadeIn(clientVersionLabel, 1500) end)
   end
@@ -42,8 +44,4 @@ end
 
 function setVersionText(text)
   clientVersionLabel:setText(text)
-end
-
-function getBackground()
-  return background
 end

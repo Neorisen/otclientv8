@@ -7,13 +7,11 @@ function UISpinBox.create()
   spinbox:setValidCharacters('0123456789')
   spinbox.displayButtons = true
   spinbox.minimum = 0
-  spinbox.maximum = 1
+  spinbox.maximum = 0
   spinbox.value = 0
   spinbox.step = 1
   spinbox.firstchange = true
-  spinbox.mouseScroll = true
-  spinbox:setText("1")
-  spinbox:setValue(1)
+  spinbox:setText("0")
   return spinbox
 end
 
@@ -23,9 +21,6 @@ function UISpinBox:onSetup()
 end
 
 function UISpinBox:onMouseWheel(mousePos, direction)
-  if not self.mouseScroll or self.disableScroll then
-    return false
-  end
   if direction == MouseWheelUp then
     self:up()
   elseif direction == MouseWheelDown then
@@ -66,27 +61,15 @@ function UISpinBox:onTextChange(text, oldText)
 end
 
 function UISpinBox:onValueChange(value)
-  -- nothing to do
-end
-
-function UISpinBox:onFocusChange(focused)
-  if not focused then
-    if self:getText():len() == 0 then
-      self:setText(self.minimum)
-    end
-  end
+  -- nothing todo
 end
 
 function UISpinBox:onStyleApply(styleName, styleNode)
   for name, value in pairs(styleNode) do
     if name == 'maximum' then
-      self.maximum = value
       addEvent(function() self:setMaximum(value) end)
     elseif name == 'minimum' then
-      self.minimum = value
       addEvent(function() self:setMinimum(value) end)
-    elseif name == 'mouse-scroll' then
-      addEvent(function() self:setMouseScroll(value) end)
     elseif name == 'buttons' then
       addEvent(function()
         if value then
@@ -119,19 +102,14 @@ function UISpinBox:down()
   self:setValue(self.value - self.step)
 end
 
-function UISpinBox:setValue(value, dontSignal)
-  if type(value) == "string" then
-    value = tonumber(value)
-  end
+function UISpinBox:setValue(value)
   value = value or 0
   value = math.max(math.min(self.maximum, value), self.minimum)
-
   if value == self.value then return end
-
-  self.value = value
   if self:getText():len() > 0 then
     self:setText(value)
   end
+  self.value = value
 
   local upButton = self:getChildById('up')
   local downButton = self:getChildById('down')
@@ -142,9 +120,7 @@ function UISpinBox:setValue(value, dontSignal)
     downButton:setEnabled(self.maximum ~= self.minimum and self.value ~= self.minimum)
   end
 
-  if not dontSignal then
-    signalcall(self.onValueChange, self, value)
-  end
+  signalcall(self.onValueChange, self, value)
 end
 
 function UISpinBox:getValue()
@@ -180,12 +156,4 @@ end
 
 function UISpinBox:setStep(step)
   self.step = step or 1
-end
-
-function UISpinBox:setMouseScroll(mouseScroll)
-  self.mouseScroll = mouseScroll
-end
-
-function UISpinBox:getMouseScroll()
-  return self.mouseScroll
 end

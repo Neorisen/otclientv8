@@ -13,7 +13,7 @@ function init()
 
   g_keyboard.bindKeyDown('Ctrl+P', toggle)
 
-  vipButton = modules.client_topmenu.addRightGameToggleButton('vipListButton', tr('VIP List') .. ' (Ctrl+P)', '/images/topbuttons/viplist', toggle, false, 3)
+  vipButton = modules.client_topmenu.addRightGameToggleButton('vipListButton', tr('VIP List') .. ' (Ctrl+P)', '/images/topbuttons/viplist', toggle)
   vipButton:setOn(true)
   vipWindow = g_ui.loadUI('viplist', modules.game_interface.getRightPanel())
 
@@ -22,6 +22,7 @@ function init()
   end
   refresh()
   vipWindow:setup()
+  vipButton:hide()
 end
 
 function terminate()
@@ -92,9 +93,7 @@ function onMiniWindowClose()
 end
 
 function createAddWindow()
-  if not addVipWindow then
-    addVipWindow = g_ui.displayUI('addvip')
-  end
+  addVipWindow = g_ui.displayUI('addvip')
 end
 
 function createEditWindow(widget)
@@ -285,10 +284,8 @@ function onAddVip(id, name, state, description, iconId, notify)
 
   if state == VipState.Online then
     label:setColor('#00ff00')
-  elseif state == VipState.Pending then
-    label:setColor('#ffca38')
   else
-    label:setColor('#ff0000')
+    label:setColor('#cc3939')
   end
 
   label.vipState = state
@@ -347,10 +344,6 @@ function onVipStateChange(id, state)
   label:destroy()
 
   onAddVip(id, name, state, description, iconId, notify)
-
-  if notify and state ~= VipState.Pending then
-    modules.game_textmessage.displayFailureMessage(tr('%s has logged %s.', name, (state == VipState.Online and 'in' or 'out')))
-  end
 end
 
 function onVipListMousePress(widget, mousePos, mouseButton)
@@ -359,7 +352,6 @@ function onVipListMousePress(widget, mousePos, mouseButton)
   local vipList = vipWindow:getChildById('contentsPanel')
 
   local menu = g_ui.createWidget('PopupMenu')
-  menu:setGameMenu(true)
   menu:addOption(tr('Add new VIP'), function() createAddWindow() end)
 
   menu:addSeparator()
@@ -392,7 +384,6 @@ function onVipListLabelMousePress(widget, mousePos, mouseButton)
   local vipList = vipWindow:getChildById('contentsPanel')
 
   local menu = g_ui.createWidget('PopupMenu')
-  menu:setGameMenu(true)
   menu:addOption(tr('Send Message'), function() g_game.openPrivateChannel(widget:getText()) end)
   menu:addOption(tr('Add new VIP'), function() createAddWindow() end)
   menu:addOption(tr('Edit %s', widget:getText()), function() if widget then createEditWindow(widget) end end)

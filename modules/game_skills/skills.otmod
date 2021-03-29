@@ -2,7 +2,7 @@ Module
   name: game_skills
   description: Manage skills window
   author: baxnie, edubart
-  website: https://github.com/edubart/otclient
+  website: www.otclient.info
   sandboxed: true
   scripts: [ skills ]
   @onLoad: init()

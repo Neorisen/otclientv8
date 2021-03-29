@@ -1,8 +1,3 @@
-MarketMaxAmount = 2000
-MarketMaxAmountStackable = 64000
-MarketMaxPrice = 999999999
-MarketMaxOffers = 100
-
 MarketAction = {
   Buy = 0,
   Sell = 1
@@ -45,20 +40,11 @@ MarketCategory = {
   Swords = 20,
   WandsRods = 21,
   PremiumScrolls = 22,
-  TibiaCoins = 23,
-  CreatureProducs = 24,
-  Unknown1 = 25,
-  Unknown2 = 26,
-  StashRetrieve = 27,
-  Unknown3 = 28,
-  Unknown4 = 29,
-  Gold = 30,
-  Unassigned = 31,
   MetaWeapons = 255
 }
 
 MarketCategory.First = MarketCategory.Armors
-MarketCategory.Last = MarketCategory.Unassigned
+MarketCategory.Last = MarketCategory.PremiumScrolls
 
 MarketCategoryWeapons = {
   [MarketCategory.Ammunition] = { slots = {255} },
@@ -93,15 +79,6 @@ MarketCategoryStrings = {
   [20] = 'Swords',
   [21] = 'Wands and Rods',
   [22] = 'Premium Scrolls',
-  [23] = 'Tibia Coins',
-  [24] = 'Creature Products',
-  [25] = 'Unknown 1',
-  [26] = 'Unknown 2',
-  [27] = 'Stash Retrieve',
-  [28] = 'Unknown 3',
-  [29] = 'Unknown 4',
-  [30] = 'Gold',
-  [31] = 'Unassigned',  
   [255] = 'Weapons'
 }
 
@@ -133,8 +110,7 @@ MarketItemDescription = {
   Ability = 12,
   Charges = 13,
   WeaponName = 14,
-  Weight = 15,
-  Imbuements = 16
+  Weight = 15
 }
 
 MarketItemDescription.First = MarketItemDescription.Armor
@@ -155,8 +131,7 @@ MarketItemDescriptionStrings = {
   [12] = 'Ability',
   [13] = 'Charges',
   [14] = 'Weapon Type',
-  [15] = 'Weight',
-  [16] = 'Imbuements'
+  [15] = 'Weight'
 }
 
 function getMarketDescriptionName(id)
@@ -185,8 +160,8 @@ MarketFilters = {
   SearchAll = 4
 }
 
-MarketFilters.First = MarketFilters.Vocation
-MarketFilters.Last = MarketFilters.Depot
+MarketFilters.First = MarketFilters.vocation
+MarketFilters.Last = MarketFilters.depot
 
 function getMarketSlotFilterId(name)
   local id = table.find(MarketSlotFilters, name)

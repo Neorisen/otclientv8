@@ -33,20 +33,7 @@ NpcIconTrade = 2
 NpcIconQuest = 3
 NpcIconTradeQuest = 4
 
-CreatureTypePlayer = 0
-CreatureTypeMonster = 1
-CreatureTypeNpc = 2
-CreatureTypeSummonOwn = 3
-CreatureTypeSummonOther = 4
-
 -- @}
-
-function getNextSkullId(skullId)
-  if skullId == SkullRed or skullId == SkullBlack then
-    return SkullBlack
-  end
-  return SkullRed
-end
 
 function getSkullImagePath(skullId)
   local path
@@ -110,16 +97,6 @@ function getEmblemImagePath(emblemId)
   return path
 end
 
-function getTypeImagePath(creatureType)
-  local path
-  if creatureType == CreatureTypeSummonOwn then
-    path = '/images/game/creaturetype/summon_own'
-  elseif creatureType == CreatureTypeSummonOther then
-    path = '/images/game/creaturetype/summon_other'
-  end
-  return path
-end
-
 function getIconImagePath(iconId)
   local path
   if iconId == NpcIconChat then
@@ -155,22 +132,9 @@ function Creature:onEmblemChange(emblemId)
   end
 end
 
-function Creature:onTypeChange(typeId)
-  local imagePath = getTypeImagePath(typeId)
-  if imagePath then
-    self:setTypeTexture(imagePath)
-  end
-end
-
 function Creature:onIconChange(iconId)
   local imagePath = getIconImagePath(iconId)
   if imagePath then
     self:setIconTexture(imagePath)
   end
-end
-
-function Creature:setOutfitShader(shader)
-  local outfit = self:getOutfit()
-  outfit.shader = shader
-  self:setOutfit(outfit)
 end

@@ -2,7 +2,7 @@ Module
   name: game_playerdeath
   description: Manage player deaths
   author: BeniS, edubart
-  website: https://github.com/edubart/otclient
+  website: www.otclient.info
   sandboxed: true
   scripts: [ playerdeath ]
   @onLoad: init()

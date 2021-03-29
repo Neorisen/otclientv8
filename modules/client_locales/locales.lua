@@ -4,7 +4,15 @@ dofile 'neededtranslations'
 local defaultLocaleName = 'en'
 local installedLocales
 local currentLocale
-local missingTranslations = {}
+
+function sendLocale(localeName)
+  local protocolGame = g_game.getProtocolGame()
+  if protocolGame then
+    protocolGame:sendExtendedOpcode(ExtendedIds.Locale, localeName)
+    return true
+  end
+  return false
+end
 
 function createWindow()
   localesWindow = g_ui.displayUI('locales')
@@ -36,7 +44,18 @@ function selectFirstLocale(name)
   if setLocale(name) then
     g_modules.reloadModules()
   end
-  g_settings.save()
+end
+
+-- hooked functions
+function onGameStart()
+  sendLocale(currentLocale.name)
+end
+
+function onExtendedLocales(protocol, opcode, buffer)
+  local locale = installedLocales[buffer]
+  if locale and setLocale(locale.name) then
+    g_modules.reloadModules()
+  end
 end
 
 -- public functions
@@ -50,15 +69,20 @@ function init()
     pdebug('Using configured locale: ' .. userLocaleName)
   else
     setLocale(defaultLocaleName)
-    --connect(g_app, { onRun = createWindow })
+    connect(g_app, { onRun = createWindow })
   end
+
+  ProtocolGame.registerExtendedOpcode(ExtendedIds.Locale, onExtendedLocales)
+  connect(g_game, { onGameStart = onGameStart })
 end
 
 function terminate()
   installedLocales = nil
   currentLocale = nil
 
-  --disconnect(g_app, { onRun = createWindow })
+  ProtocolGame.unregisterExtendedOpcode(ExtendedIds.Locale)
+  disconnect(g_app, { onRun = createWindow })
+  disconnect(g_game, { onGameStart = onGameStart })
 end
 
 function generateNewTranslationTable(localename)
@@ -89,18 +113,15 @@ function installLocale(locale)
   if _G.allowedLocales and not _G.allowedLocales[locale.name] then return end
 
   if locale.name ~= defaultLocaleName then
-    local updatesNamesMissing = {}
-    for _,k in pairs(neededTranslations) do
+    local updatesNeeded = 0
+    for _i,k in pairs(neededTranslations) do
       if locale.translation[k] == nil then
-        updatesNamesMissing[#updatesNamesMissing + 1] = k
+        updatesNeeded = updatesNeeded + 1
       end
     end
 
-    if #updatesNamesMissing > 0 then
-      pdebug('Locale \'' .. locale.name .. '\' is missing ' .. #updatesNamesMissing .. ' translations.')
-      for _,name in pairs(updatesNamesMissing) do
-        pdebug('["' .. name ..'"] = \"\",')
-      end
+    if updatesNeeded > 0 then
+      pdebug('Locale \'' .. locale.name .. '\' is missing ' .. updatesNeeded .. ' translations.')
     end
   end
 
@@ -125,6 +146,9 @@ function setLocale(name)
     pwarning("Locale " .. name .. ' does not exist.')
     return false
   end
+  if currentLocale then
+    sendLocale(locale.name)
+  end
   currentLocale = locale
   g_settings.set('locale', name)
   if onLocaleChanged then onLocaleChanged(name) end
@@ -142,19 +166,15 @@ end
 -- global function used to translate texts
 function _G.tr(text, ...)
   if currentLocale then
-    if tonumber(text) and currentLocale.formatNumbers then
-      local number = tostring(text):split('.')
+    if tonumber(text) then
+      -- todo: use locale information to calculate this. also detect floating numbers
       local out = ''
-      local reverseNumber = number[1]:reverse()
-      for i=1,#reverseNumber do
-        out = out .. reverseNumber:sub(i, i)
+      local number = tostring(text):reverse()
+      for i=1,#number do
+        out = out .. number:sub(i, i)
         if i % 3 == 0 and i ~= #number then
-          out = out .. currentLocale.thousandsSeperator
+          out = out .. ','
         end
-      end
-
-      if number[2] then
-        out = number[2] .. currentLocale.decimalSeperator .. out
       end
       return out:reverse()
     elseif tostring(text) then
@@ -162,10 +182,7 @@ function _G.tr(text, ...)
       if not translation then
         if translation == nil then
           if currentLocale.name ~= defaultLocaleName then
-            if not missingTranslations[text] then
-              pdebug('Unable to translate: \"' .. text .. '\"')
-              missingTranslations[text] = true
-            end
+            pdebug('Unable to translate: \"' .. text .. '\"')
           end
         end
         translation = text

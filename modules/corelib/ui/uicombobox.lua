@@ -7,9 +7,6 @@ function UIComboBox.create()
   combobox.options = {}
   combobox.currentIndex = -1
   combobox.mouseScroll = true
-  combobox.menuScroll = false
-  combobox.menuHeight = 100
-  combobox.menuScrollStep = 0
   return combobox
 end
 
@@ -19,69 +16,45 @@ function UIComboBox:clearOptions()
   self:clearText()
 end
 
-function UIComboBox:clear()
-  return self:clearOptions()
-end
-
-function UIComboBox:getOptionsCount()
-  return #self.options
-end
-
-function UIComboBox:isOption(text)
-  if not self.options then return false end
+function UIComboBox:getOption(text)
+  if not self.options then return nil end
   for i,v in ipairs(self.options) do
     if v.text == text then
-      return true
+      return nil
     end
   end
-  return false
 end
 
-function UIComboBox:setOption(text, dontSignal)
-  self:setCurrentOption(text, dontSignal)
-end
-
-function UIComboBox:setCurrentOption(text, dontSignal)
+function UIComboBox:setCurrentOption(text)
   if not self.options then return end
   for i,v in ipairs(self.options) do
     if v.text == text and self.currentIndex ~= i then
       self.currentIndex = i
       self:setText(text)
-      if not dontSignal then
-        signalcall(self.onOptionChange, self, text, v.data)
-      end
+      signalcall(self.onOptionChange, self, text, v.data)
       return
     end
   end
 end
 
-function UIComboBox:updateCurrentOption(newText)
-  self.options[self.currentIndex].text = newText
-  self:setText(newText)
-end
-
-function UIComboBox:setCurrentOptionByData(data, dontSignal)
+function UIComboBox:setCurrentOptionByData(data)
   if not self.options then return end
   for i,v in ipairs(self.options) do
     if v.data == data and self.currentIndex ~= i then
       self.currentIndex = i
       self:setText(v.text)
-      if not dontSignal then
-        signalcall(self.onOptionChange, self, v.text, v.data)
-      end
+      signalcall(self.onOptionChange, self, v.text, v.data)
       return
     end
   end
 end
 
-function UIComboBox:setCurrentIndex(index, dontSignal)
+function UIComboBox:setCurrentIndex(index)
   if index >= 1 and index <= #self.options then
     local v = self.options[index]
     self.currentIndex = index
     self:setText(v.text)
-    if not dontSignal then
-      signalcall(self.onOptionChange, self, v.text, v.data)
-    end
+    signalcall(self.onOptionChange, self, v.text, v.data)
   end
 end
 
@@ -113,16 +86,7 @@ function UIComboBox:removeOption(text)
 end
 
 function UIComboBox:onMousePress(mousePos, mouseButton)
-  local menu
-  if self.menuScroll then
-    menu = g_ui.createWidget(self:getStyleName() .. 'PopupScrollMenu')
-    menu:setHeight(self.menuHeight)
-    if self.menuScrollStep > 0 then
-      menu:setScrollbarStep(self.menuScrollStep)
-    end
-  else
-    menu = g_ui.createWidget(self:getStyleName() .. 'PopupMenu')
-  end
+  local menu = g_ui.createWidget(self:getStyleName() .. 'PopupMenu')
   menu:setId(self:getId() .. 'PopupMenu')
   for i,v in ipairs(self.options) do
     menu:addOption(v.text, function() self:setCurrentOption(v.text) end)
@@ -135,7 +99,7 @@ function UIComboBox:onMousePress(mousePos, mouseButton)
 end
 
 function UIComboBox:onMouseWheel(mousePos, direction)
-  if not self.mouseScroll or self.disableScroll then
+  if not self.mouseScroll then
     return false
   end
   if direction == MouseWheelUp and self.currentIndex > 1 then
@@ -165,12 +129,6 @@ function UIComboBox:onStyleApply(styleName, styleNode)
   for name,value in pairs(styleNode) do
     if name == 'mouse-scroll' then
       self.mouseScroll = value
-    elseif name == 'menu-scroll' then
-      self.menuScroll = value
-    elseif name == 'menu-height' then
-      self.menuHeight = value
-    elseif name == 'menu-scroll-step' then
-      self.menuScrollStep = value
     end
   end
 end

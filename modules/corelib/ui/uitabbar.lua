@@ -38,7 +38,6 @@ function UITabBar:addTab(text, panel, icon)
   end
 
   local tab = g_ui.createWidget(self:getStyleName() .. 'Button', self.buttonsPanel)
-
   panel.isTab = true
   tab.tabPanel = panel
   tab.tabBar = self
@@ -154,10 +153,4 @@ end
 
 function UITabBar:getTabsPanel()
   return table.collect(self.tabs, function(_,tab) return tab.tabPanel end)
-end
-
-function UITabBar:clearTabs()
-  while #self.tabs > 0 do
-    self:removeTab(self.tabs[#self.tabs])
-  end
 end

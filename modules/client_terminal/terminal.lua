@@ -30,10 +30,6 @@ local allLines = {}
 
 -- private functions
 local function navigateCommand(step)
-  if commandTextEdit:isMultiline() then
-    return
-  end
-
   local numCommands = #commandHistory
   if numCommands > 0 then
     currentHistoryIndex = math.min(math.max(currentHistoryIndex + step, 0), numCommands)
@@ -100,27 +96,14 @@ local function completeCommand()
   end
 end
 
-local function doCommand(textWidget)
-  local currentCommand = textWidget:getText()
+local function doCommand()
+  local currentCommand = commandTextEdit:getText()
   executeCommand(currentCommand)
-  textWidget:clearText()
+
+  if commandTextEdit then
+    commandTextEdit:clearText()
+  end
   return true
-end
-
-local function addNewline(textWidget)
-  if not textWidget:isOn() then
-    textWidget:setOn(true)
-  end
-  textWidget:appendText('\n')
-end
-
-local function onCommandChange(textWidget, newText, oldText)
-  local _, newLineCount = string.gsub(newText, '\n', '\n')
-  textWidget:setHeight((newLineCount + 1) * textWidget.baseHeight)
-
-  if newLineCount == 0 and textWidget:isOn() then
-    textWidget:setOn(false)
-  end
 end
 
 local function onLog(level, message, time)
@@ -141,14 +124,11 @@ function init()
   terminalWindow.onDoubleClick = popWindow
 
   terminalButton = modules.client_topmenu.addLeftButton('terminalButton', tr('Terminal') .. ' (Ctrl + T)', '/images/topbuttons/terminal', toggle)
-  terminalButton:setOn(false)
   g_keyboard.bindKeyDown('Ctrl+T', toggle)
 
   commandHistory = g_settings.getList('terminal-history')
 
   commandTextEdit = terminalWindow:getChildById('commandTextEdit')
-  commandTextEdit:setHeight(commandTextEdit.baseHeight)
-  connect(commandTextEdit, {onTextChange = onCommandChange})
   g_keyboard.bindKeyPress('Up', function() navigateCommand(1) end, commandTextEdit)
   g_keyboard.bindKeyPress('Down', function() navigateCommand(-1) end, commandTextEdit)
   g_keyboard.bindKeyPress('Ctrl+C',
@@ -158,7 +138,6 @@ function init()
     return true
     end, commandTextEdit)
   g_keyboard.bindKeyDown('Tab', completeCommand, commandTextEdit)
-  g_keyboard.bindKeyPress('Shift+Enter', addNewline, commandTextEdit)
   g_keyboard.bindKeyDown('Enter', doCommand, commandTextEdit)
   g_keyboard.bindKeyDown('Escape', hide, terminalWindow)
 
@@ -204,7 +183,7 @@ function terminate()
 end
 
 function hideButton()
-  --terminalButton:hide()
+  terminalButton:hide()
 end
 
 function popWindow()
@@ -223,9 +202,9 @@ function popWindow()
   else
     terminalWindow:breakAnchors()
     terminalWindow:setOn(true)
-    local size = oldSize or { width = g_window.getWidth()/2.5, height = g_window.getHeight()/4 }
+    local size = oldSize or { width = g_window.getWidth()/2, height = g_window.getHeight()/2 }
     terminalWindow:setSize(size)
-    local pos = oldPos or { x = 0, y = g_window.getHeight() }
+    local pos = oldPos or { x = (g_window.getWidth() - terminalWindow:getWidth())/2, y = (g_window.getHeight() - terminalWindow:getHeight())/2 }
     terminalWindow:setPosition(pos)
     terminalWindow:getChildById('bottomResizeBorder'):enable()
     terminalWindow:getChildById('rightResizeBorder'):enable()
@@ -266,7 +245,7 @@ function hide()
 end
 
 function disable()
-  --terminalButton:hide()
+  terminalButton:hide()
   g_keyboard.unbindKeyDown('Ctrl+T')
   disabled = true
 end
@@ -313,22 +292,11 @@ function addLine(text, color)
   table.insert(cachedLines, {text=text, color=color})
 end
 
-function terminalPrint(value)
-  if type(value) == "table" then
-    return print(json.encode(value, 2))
-  end
-  print(tostring(value))
-end
-
 function executeCommand(command)
-  if command == nil or #string.gsub(command, '\n', '') == 0 then return end
+  if command == nil or #command == 0 then return end
 
   -- add command line
   addLine("> " .. command, "#ffffff")
-  if g_game.getFeature(GameNoDebug) then
-    addLine("Terminal is disabled on this server", "#ff8888")
-    return    
-  end
 
   -- reset current history index
   currentHistoryIndex = 0
@@ -336,7 +304,7 @@ function executeCommand(command)
   -- add new command to history
   if #commandHistory == 0 or commandHistory[#commandHistory] ~= command then
     table.insert(commandHistory, command)
-    while #commandHistory > MaxHistory do
+    if #commandHistory > MaxHistory then
       table.remove(commandHistory, 1)
     end
   end
@@ -344,7 +312,7 @@ function executeCommand(command)
   -- detect and convert commands with simple syntax
   local realCommand
   if string.sub(command, 1, 1) == '=' then
-    realCommand = 'modules.client_terminal.terminalPrint(' .. string.sub(command,2) .. ')'
+    realCommand = 'print(' .. string.sub(command,2) .. ')'
   else
     realCommand = command
   end
@@ -370,8 +338,6 @@ function executeCommand(command)
     addLine('ERROR: incorrect lua syntax: ' .. err:sub(5), 'red')
     return
   end
-  
-  commandEnv['player'] = g_game.getLocalPlayer()
 
   -- setup func env to commandEnv
   setfenv(func, commandEnv)

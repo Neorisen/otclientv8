@@ -45,22 +45,6 @@ Directions = {
   NorthWest = 7
 }
 
-Skill = {
-  Fist = 0,
-  Club = 1,
-  Sword = 2,
-  Axe = 3,
-  Distance = 4,
-  Shielding = 5,
-  Fishing = 6,
-  CriticalChance = 7,
-  CriticalDamage = 8,
-  LifeLeechChance = 9,
-  LifeLeechAmount = 10,
-  ManaLeechChance = 11,
-  ManaLeechAmount = 12
-}
-
 North = Directions.North
 East = Directions.East
 South = Directions.South
@@ -100,7 +84,7 @@ GameItemAnimationPhase = 15
 GameMagicEffectU16 = 16
 GamePlayerMarket = 17
 GameSpritesU32 = 18
-GameTileAddThingWithStackpos = 19
+GameChargeableItems = 19
 GameOfflineTrainingTime = 20
 GamePurseSlot = 21
 GameFormatCreatureName = 22
@@ -125,79 +109,15 @@ GameLooktypeU16 = 42
 GamePlayerStamina = 43
 GamePlayerAddons = 44
 GameMessageStatements = 45
-GameMessageLevel = 46
+GameMesssageLevel = 46
 GameNewFluids = 47
 GamePlayerStateU16 = 48
 GameNewOutfitProtocol = 49
 GamePVPMode = 50
 GameWritableDate = 51
 GameAdditionalVipInfo = 52
-GameBaseSkillU16 = 53
-GameCreatureIcons = 54
-GameHideNpcNames = 55
 GameSpritesAlphaChannel = 56
-GamePremiumExpiration = 57
-GameBrowseField = 58
-GameEnhancedAnimations = 59
-GameOGLInformation = 60
-GameMessageSizeCheck = 61
-GamePreviewState = 62
-GameLoginPacketEncryption = 63
-GameClientVersion = 64
-GameContentRevision = 65
-GameExperienceBonus = 66
-GameAuthenticator = 67
-GameUnjustifiedPoints = 68
-GameSessionKey = 69
-GameDeathType = 70
-GameIdleAnimations = 71
-GameKeepUnawareTiles = 72
-GameIngameStore = 73
-GameIngameStoreHighlights = 74
-GameIngameStoreServiceType = 75
-GameAdditionalSkills = 76
-GameDistanceEffectU16 = 77
-GamePrey = 78
-GameDoubleMagicLevel = 79
 
-GameExtendedOpcode = 80
-GameMinimapLimitedToSingleFloor = 81
-GameSendWorldName = 82
-
-GameDoubleLevel = 83
-GameDoubleSoul = 84
-GameDoublePlayerGoodsMoney = 85
-GameCreatureWalkthrough = 86 -- add Walkthrough for versions less than 854, unpass = msg->getU8(); in protocolgameparse.cpp
-GameDoubleTradeMoney = 87
-GameSequencedPackets = 88
-GameTibia12Protocol = 89
-
-GameNewWalking = 90
-GameSlowerManualWalking = 91
-GameItemTooltip = 93
-
-GameBot = 95
-GameBiggerMapCache = 96
-GameForceLight = 97
-GameNoDebug = 98
-GameBotProtection = 99
-
-GameCreatureDirectionPassable = 100
-GameFasterAnimations = 101
-GameCenteredOutfits = 102
-GameSendIdentifiers = 103
-GameWingsAndAura = 104
-GamePlayerStateU32 = 105
-GameOutfitShaders = 106
-GameForceAllowItemHotkeys = 107
-GameCountU16 = 108
-GameDrawAuraOnTop = 109
-
-GamePacketSizeU32 = 110
-GamePacketCompression = 111
-
-LastGameFeature = 130
-        
 TextColors = {
   red       = '#f55e5e', --'#c83200'
   orange    = '#f36500', --'#c87832'
@@ -253,18 +173,15 @@ MessageModes = {
   TutorialHint            = 38,
   Thankyou                = 39,
   Market                  = 40,
-  Mana                    = 41,
-  BeyondLast              = 42,
-  MonsterYell             = 43,
-  MonsterSay              = 44,
-  Red                     = 45,
-  Blue                    = 46,
-  RVRChannel              = 47,
-  RVRAnswer               = 48,
-  RVRContinue             = 49,
-  GameHighlight           = 50,
-  NpcFromStartBlock       = 51,
-  Last                    = 52,
+  BeyondLast              = 41,
+  MonsterYell             = 42,
+  MonsterSay              = 43,
+  Red                     = 44,
+  Blue                    = 45,
+  RVRChannel              = 46,
+  RVRAnswer               = 47,
+  RVRContinue             = 48,
+  Last                    = 49,
   Invalid                 = 255,
 }
 
@@ -281,7 +198,7 @@ CIPSOFT_RSA = "1321277432058722840622950990822933849527763264961655079678763618"
               "88792221429527047321331896351555606801473202394175817"
 
 -- set to the latest Tibia.pic signature to make otclient compatible with official tibia
-PIC_SIGNATURE = 0x56C5DDE7
+PIC_SIGNATURE = 0x52de78da
 
 OsTypes = {
   Linux = 1,
@@ -322,66 +239,6 @@ ExtendedIds = {
   Particles = 5,
   MapShader = 6,
   NeedsUpdate = 7
-}
-
-PreviewState = {
-  Default = 0,
-  Inactive = 1,
-  Active = 2
-}
-
-Blessings = {
-  None = 0,
-  Adventurer = 1,
-  SpiritualShielding = 2,
-  EmbraceOfTibia = 4,
-  FireOfSuns = 8,
-  WisdomOfSolitude = 16,
-  SparkOfPhoenix = 32
-}
-
-DeathType = {
-  Regular = 0,
-  Blessed = 1
-}
-
-ProductType = {
-  Other = 0,
-  NameChange = 1
-}
-
-StoreErrorType = {
-  NoError = -1,
-  PurchaseError = 0,
-  NetworkError = 1,
-  HistoryError = 2,
-  TransferError = 3,
-  Information = 4
-}
-
-StoreState = {
-  None = 0,
-  New = 1,
-  Sale = 2,
-  Timed = 3
-}
-
-AccountStatus = {
-  Ok = 0,
-  Frozen = 1,
-  Suspended = 2,
-}
-
-SubscriptionStatus = {
-  Free = 0,
-  Premium = 1,
-}
-
-ChannelEvent = {
-  Join = 0,
-  Leave = 1,
-  Invite = 2,
-  Exclude = 3,
 }
 
 -- @}

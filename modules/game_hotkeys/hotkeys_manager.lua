@@ -10,16 +10,26 @@ HotkeyColors = {
   itemUseSelf = '#00FF00',
   itemUseTarget = '#FF0000',
   itemUseWith = '#F5B325',
-  extraAction = '#FFAA00'
 }
+
+overlay = nil
+healthCircleFront = nil
+manaCircleFront = nil
+healthCircle = nil
+manaCircle = nil
+topHealthBar = nil
+topManaBar = nil
+topExperienceBar = nil
+healthTooltip = 'Posiadasz %d zycia z %d.'
+manaTooltip = 'Posiadasz %d many z %d.'
+experienceTooltip = 'Posiadasz %d%% do %d poziomu.'
 
 hotkeysManagerLoaded = false
 hotkeysWindow = nil
-configSelector = nil
 hotkeysButton = nil
 currentHotkeyLabel = nil
 currentItemPreview = nil
-itemWidget = nil
+itemWidget = false
 addHotkeyButton = nil
 removeHotkeyButton = nil
 hotkeyText = nil
@@ -31,26 +41,20 @@ useOnSelf = nil
 useOnTarget = nil
 useWith = nil
 defaultComboKeys = nil
+perServer = true
 perCharacter = true
 mouseGrabberWidget = nil
 useRadioGroup = nil
 currentHotkeys = nil
 boundCombosCallback = {}
 hotkeysList = {}
-hotkeyConfigs = {}
-currentConfig = 1
-configValueChanged = false
 
 -- public functions
 function init()
-  if not g_app.isMobile() then
-    hotkeysButton = modules.client_topmenu.addLeftGameButton('hotkeysButton', tr('Hotkeys') .. ' (Ctrl+K)', '/images/topbuttons/hotkeys', toggle, false, 7)
-  end
   g_keyboard.bindKeyDown('Ctrl+K', toggle)
   hotkeysWindow = g_ui.displayUI('hotkeys_manager')
   hotkeysWindow:setVisible(false)
-  
-  configSelector = hotkeysWindow:getChildById('configSelector')
+
   currentHotkeys = hotkeysWindow:getChildById('currentHotkeys')
   currentItemPreview = hotkeysWindow:getChildById('itemPreview')
   addHotkeyButton = hotkeysWindow:getChildById('addHotkeyButton')
@@ -74,23 +78,51 @@ function init()
   mouseGrabberWidget:setVisible(false)
   mouseGrabberWidget:setFocusable(false)
   mouseGrabberWidget.onMouseRelease = onChooseItemMouseRelease
+  
+  healthCircleButton = modules.client_topmenu.addRightGameToggleButton('healtCircleButton', tr('Health and mana'), '/images/topbuttons/circle', togglehealth)
+  healthCircleButton:setOn(true)
+  healthCircleButton:hide()
+
+
+  topHealthBarButton = modules.client_topmenu.addRightGameToggleButton('topHealthBarButton', tr('Health and mana'), '/images/topbuttons/tophealth', togglehealthbar)
+  topHealthBarButton:setOn(true)
+  topHealthBarButton:hide()
+  
 
   currentHotkeys.onChildFocusChange = function(self, hotkeyLabel) onSelectHotkeyLabel(hotkeyLabel) end
   g_keyboard.bindKeyPress('Down', function() currentHotkeys:focusNextChild(KeyboardFocusReason) end, hotkeysWindow)
   g_keyboard.bindKeyPress('Up', function() currentHotkeys:focusPreviousChild(KeyboardFocusReason) end, hotkeysWindow)
-
-  if hotkeysWindow.action and setupExtraHotkeys then
-    setupExtraHotkeys(hotkeysWindow.action)
-  end
+  
+  overlay = g_ui.createWidget('HealthOverlay', modules.game_interface.getMapPanel())  
+  healthCircleFront = overlay:getChildById('healthCircleFront')
+  manaCircleFront = overlay:getChildById('manaCircleFront')
+  healthCircle = overlay:getChildById('healthCircle')
+  manaCircle = overlay:getChildById('manaCircle')
+  topHealthBar = overlay:getChildById('topHealthBar')
+  topManaBar = overlay:getChildById('topManaBar')
+  topExperienceBar = overlay:getChildById('topExperienceBar')
+  
+  connect(overlay, { onGeometryChange = onOverlayGeometryChange })
+  
+  connect(LocalPlayer, { onHealthChange = onHealthChange,
+                         onManaChange = onManaChange,
+                         onLevelChange = onLevelChange})
 
   connect(g_game, {
     onGameStart = online,
+    useOnSelf:hide(),
+    useOnTarget:hide(),
+    useWith:hide(),
     onGameEnd = offline
-  })  
+  })
   
-  for i = 1, configSelector:getOptionsCount() do
-    hotkeyConfigs[i] = g_configs.create("/hotkeys_" .. i .. ".otml")
+  if g_game.isOnline() then
+    local localPlayer = g_game.getLocalPlayer()
+    onHealthChange(localPlayer, localPlayer:getHealth(), localPlayer:getMaxHealth())
+    onManaChange(localPlayer, localPlayer:getMana(), localPlayer:getMaxMana())
+    onLevelChange(localPlayer, localPlayer:getLevel(), localPlayer:getLevelPercent())
   end
+
 
   load()
 end
@@ -100,16 +132,27 @@ function terminate()
     onGameStart = online,
     onGameEnd = offline
   })
+  
+  disconnect(LocalPlayer, { onHealthChange = onHealthChange,
+                            onManaChange = onManaChange,
+                            onLevelChange = onLevelChange })
+
+  disconnect(g_game, { onGameEnd = offline })
+  disconnect(overlay, { onGeometryChange = onOverlayGeometryChange })
 
   g_keyboard.unbindKeyDown('Ctrl+K')
 
   unload()
 
   hotkeysWindow:destroy()
-  if hotkeysButton then
-    hotkeysButton:destroy()
-  end
   mouseGrabberWidget:destroy()
+  overlay:destroy()
+end
+
+function configure(savePerServer, savePerCharacter)
+  perServer = savePerServer
+  perCharacter = savePerCharacter
+  reload()
 end
 
 function online()
@@ -155,20 +198,13 @@ end
 
 function load(forceDefaults)
   hotkeysManagerLoaded = false
-  currentConfig = 1
-  
-  local hotkeysNode = g_settings.getNode('hotkeys') or {}
-  local index = g_game.getCharacterName() .. "_" .. g_game.getClientVersion()
-  if hotkeysNode[index] ~= nil and hotkeysNode[index] > 0 and hotkeysNode[index] <= #hotkeyConfigs then
-    currentConfig = hotkeysNode[index]
-  end  
-  
-  configSelector:setCurrentIndex(currentConfig, true)
 
-  local hotkeySettings = hotkeyConfigs[currentConfig]:getNode('hotkeys')
+  local hotkeySettings = g_settings.getNode('game_hotkeys')
   local hotkeys = {}
 
   if not table.empty(hotkeySettings) then hotkeys = hotkeySettings end
+  if perServer and not table.empty(hotkeys) then hotkeys = hotkeys[G.host] end
+  if perCharacter and not table.empty(hotkeys) then hotkeys = hotkeys[g_game.getCharacterName()] end
 
   hotkeyList = {}
   if not forceDefaults then
@@ -184,15 +220,13 @@ function load(forceDefaults)
   if currentHotkeys:getChildCount() == 0 then
     loadDefautComboKeys()
   end
-  
-  configValueChanged = false
+
   hotkeysManagerLoaded = true
 end
 
 function unload()
-  local gameRootPanel = modules.game_interface.getRootPanel()
   for keyCombo,callback in pairs(boundCombosCallback) do
-    g_keyboard.unbindKeyPress(keyCombo, callback, gameRootPanel)
+    g_keyboard.unbindKeyPress(keyCombo, callback)
   end
   boundCombosCallback = {}
   currentHotkeys:destroyChildren()
@@ -212,43 +246,39 @@ function reload()
 end
 
 function save()
-  if not configValueChanged then
-    return
+  local hotkeySettings = g_settings.getNode('game_hotkeys') or {}
+  local hotkeys = hotkeySettings
+
+  if perServer then
+    if not hotkeys[G.host] then
+      hotkeys[G.host] = {}
+    end
+    hotkeys = hotkeys[G.host]
   end
-  
-  local hotkeySettings = hotkeyConfigs[currentConfig]:getNode('hotkeys') or {}  
-  
-  table.clear(hotkeySettings)
+
+  if perCharacter then
+    local char = g_game.getCharacterName()
+    if not hotkeys[char] then
+      hotkeys[char] = {}
+    end
+    hotkeys = hotkeys[char]
+  end
+
+  table.clear(hotkeys)
 
   for _,child in pairs(currentHotkeys:getChildren()) do
-    hotkeySettings[child.keyCombo] = {
+    hotkeys[child.keyCombo] = {
       autoSend = child.autoSend,
       itemId = child.itemId,
       subType = child.subType,
       useType = child.useType,
-      value = child.value,
-      action = child.action
+      value = child.value
     }
   end
 
-  hotkeyList = hotkeySettings
-  hotkeyConfigs[currentConfig]:setNode('hotkeys', hotkeySettings)
-  hotkeyConfigs[currentConfig]:save()
-  
-  local index = g_game.getCharacterName() .. "_" .. g_game.getClientVersion()
-  local hotkeysNode = g_settings.getNode('hotkeys') or {}
-  hotkeysNode[index] = currentConfig
-  g_settings.setNode('hotkeys', hotkeysNode)  
+  hotkeyList = hotkeys
+  g_settings.setNode('game_hotkeys', hotkeySettings)
   g_settings.save()
-end
-
-function onConfigChange()
-  if not configSelector then return end
-  local index = g_game.getCharacterName() .. "_" .. g_game.getClientVersion()
-  local hotkeysNode = g_settings.getNode('hotkeys') or {}
-  hotkeysNode[index] = configSelector.currentIndex
-  g_settings.setNode('hotkeys', hotkeysNode)  
-  reload()  
 end
 
 function loadDefautComboKeys()
@@ -312,6 +342,149 @@ function onChooseItemMouseRelease(self, mousePosition, mouseButton)
   return true
 end
 
+function togglehealth()
+  if healthCircleButton:isOn() then
+    healthCircleButton:setOn(false)
+    healthCircle:hide()
+    manaCircle:hide()
+    healthCircleFront:hide()
+    manaCircleFront:hide()
+  else
+    healthCircleButton:setOn(true)
+    healthCircle:show()
+    manaCircle:show()
+    healthCircleFront:show()
+    manaCircleFront:show()
+  end
+end
+
+function togglehealthbar()
+  if topHealthBarButton:isOn() then
+    topHealthBarButton:setOn(false)
+    topHealthBar:hide()
+    topManaBar:hide()
+    topExperienceBar:hide()
+  else
+    topHealthBarButton:setOn(true)
+    topHealthBar:show()
+    topManaBar:show()
+    topExperienceBar:show()
+  end
+end
+
+function onHealthChange(localPlayer, health, maxHealth) 
+  topHealthBar:setText(health .. ' / ' .. maxHealth)
+  topHealthBar:setTooltip(tr(healthTooltip, health, maxHealth))
+  topHealthBar:setValue(health, 0, maxHealth)
+  local healthPercent2 = math.floor(100*health/maxHealth)
+  if (healthPercent2 >= 93) and (healthPercent2 < 101) then
+    topHealthBar:setBackgroundColor("#00BC00FF")
+  elseif (healthPercent2 >= 61) and (healthPercent2 < 93) then
+    topHealthBar:setBackgroundColor("#50A150FF")
+  elseif (healthPercent2 >= 31) and (healthPercent2 < 61) then
+    topHealthBar:setBackgroundColor("#A1A100FF")
+  elseif (healthPercent2 >= 9) and (healthPercent2 < 31) then
+    topHealthBar:setBackgroundColor("#BF0A0AFF")
+  elseif (healthPercent2 >= 4) and (healthPercent2 < 9) then
+    topHealthBar:setBackgroundColor("#910F0FFF")
+  elseif (healthPercent2 >= 2) and (healthPercent2 < 4) then
+    topHealthBar:setBackgroundColor("#850C0CFF")
+  elseif (healthPercent2 >= 1) and (healthPercent2 < 2) then
+    topHealthBar:setBackgroundColor("#660B0BFF")
+  end
+
+  local healthPercent = math.floor(g_game.getLocalPlayer():getHealthPercent())
+  local healthPercent2 = math.floor(100*health/maxHealth)
+  local Yhppc = math.floor(208 * (1 - (math.floor((g_game.getLocalPlayer():getMaxHealth() - (g_game.getLocalPlayer():getMaxHealth() - g_game.getLocalPlayer():getHealth())) * 100 / g_game.getLocalPlayer():getMaxHealth()) / 100)))
+  local rect = { x = 0, y = Yhppc, width = 63, height = 208 }
+
+  if (healthPercent2 >= 93) and (healthPercent2 < 101) then
+    healthCircleFront:setImageColor("#00BC00FF")
+  elseif (healthPercent2 >= 61) and (healthPercent2 < 93) then
+    healthCircleFront:setImageColor("#50A150FF")
+  elseif (healthPercent2 >= 31) and (healthPercent2 < 61) then
+    healthCircleFront:setImageColor("#A1A100FF")
+  elseif (healthPercent2 >= 9) and (healthPercent2 < 31) then
+    healthCircleFront:setImageColor("#BF0A0AFF")
+  elseif (healthPercent2 >= 4) and (healthPercent2 < 9) then
+    healthCircleFront:setImageColor("#910F0FFF")
+  elseif (healthPercent2 >= 2) and (healthPercent2 < 4) then
+    healthCircleFront:setImageColor("#850C0CFF")
+  elseif (healthPercent2 >= 1) and (healthPercent2 < 2) then
+    healthCircleFront:setImageColor("#660B0BFF")
+  end
+  
+  healthCircleFront:setImageClip(rect)
+  healthCircleFront:setMarginTop(Yhppc)
+end
+
+function onManaChange(localPlayer, mana, maxMana)
+  topManaBar:setText(mana .. ' / ' .. maxMana)
+  topManaBar:setTooltip(tr(manaTooltip, mana, maxMana))
+  topManaBar:setValue(mana, 0, maxMana)
+
+  local Ymppc = math.floor(208 * (1 - (math.floor((g_game.getLocalPlayer():getMaxMana() - (g_game.getLocalPlayer():getMaxMana() - g_game.getLocalPlayer():getMana())) * 100 / g_game.getLocalPlayer():getMaxMana()) / 100)))
+  local rect = { x = 0, y = Ymppc, width = 63, height = 208 }
+  manaCircleFront:setImageClip(rect)
+  manaCircleFront:setMarginTop(Ymppc)
+end
+
+function onLevelChange(localPlayer, value, percent)
+  topExperienceBar:setTooltip(tr(experienceTooltip, percent, value+1))
+  topExperienceBar:setPercent(percent) 
+end
+
+function setHealthTooltip(tooltip)
+  healthTooltip = tooltip
+
+  local localPlayer = g_game.getLocalPlayer()
+  if localPlayer then
+    healthBar:setTooltip(tr(healthTooltip, localPlayer:getHealth(), localPlayer:getMaxHealth()))
+  end
+end
+
+function setManaTooltip(tooltip)
+  manaTooltip = tooltip
+
+  local localPlayer = g_game.getLocalPlayer()
+  if localPlayer then
+    manaBar:setTooltip(tr(manaTooltip, localPlayer:getMana(), localPlayer:getMaxMana()))
+  end
+end
+
+function setExperienceTooltip(tooltip)
+  experienceTooltip = tooltip
+
+  local localPlayer = g_game.getLocalPlayer()
+  if localPlayer then
+    experienceBar:setTooltip(tr(experienceTooltip, localPlayer:getLevelPercent(), localPlayer:getLevel()+1))
+  end
+end
+
+function onOverlayGeometryChange() 
+  local classic = g_settings.getBoolean("classicView")
+  local minMargin = 100
+  if classic then
+    topHealthBar:setMarginTop(15)
+    topManaBar:setMarginTop(15)
+    topExperienceBar:setMarginTop(15)
+  else
+    topHealthBar:setMarginTop(45)
+    topManaBar:setMarginTop(45)
+	topExperienceBar:setMarginTop(45)  
+    minMargin = 200
+  end
+
+  local height = overlay:getHeight()
+  local width = overlay:getWidth()
+  
+   
+  topHealthBar:setMarginLeft(math.max(minMargin, (width - height) / 2 + 2))
+  topManaBar:setMarginRight(math.max(minMargin, (width - height) / 2 + 2))
+  topExperienceBar:setMarginRight(math.max(minMargin, (width - height) / 2 + 2))
+  topExperienceBar:setMarginLeft(math.max(minMargin, (width - height) / 2 + 2))
+end
+
 function startChooseItem()
   if g_ui.isMouseGrabbed() then return end
   mouseGrabberWidget:grabMouse()
@@ -320,7 +493,6 @@ function startChooseItem()
 end
 
 function clearObject()
-  currentHotkeyLabel.action = nil
   currentHotkeyLabel.itemId = nil
   currentHotkeyLabel.subType = nil
   currentHotkeyLabel.useType = nil
@@ -369,7 +541,6 @@ function addKeyCombo(keyCombo, keySettings, focus)
       currentHotkeyLabel = hotkeyLabel
       hotkeyLabel.keyCombo = keyCombo
       hotkeyLabel.autoSend = toboolean(keySettings.autoSend)
-      hotkeyLabel.action = keySettings.action
       hotkeyLabel.itemId = tonumber(keySettings.itemId)
       hotkeyLabel.subType = tonumber(keySettings.subType)
       hotkeyLabel.useType = tonumber(keySettings.useType)
@@ -380,29 +551,13 @@ function addKeyCombo(keyCombo, keySettings, focus)
       hotkeyLabel.itemId = nil
       hotkeyLabel.subType = nil
       hotkeyLabel.useType = nil
-      hotkeyLabel.action = nil
       hotkeyLabel.value = ''
     end
 
     updateHotkeyLabel(hotkeyLabel)
 
-    local gameRootPanel = modules.game_interface.getRootPanel()
-    if keyCombo:lower():find("ctrl") then
-      if boundCombosCallback[keyCombo] then
-        g_keyboard.unbindKeyPress(keyCombo, boundCombosCallback[keyCombo], gameRootPanel)      
-      end
-    end
-
-    boundCombosCallback[keyCombo] = function(k, c, ticks) prepareKeyCombo(keyCombo, ticks) end
-    g_keyboard.bindKeyPress(keyCombo, boundCombosCallback[keyCombo], gameRootPanel)
-        
-    if not keyCombo:lower():find("ctrl") then
-      local keyComboCtrl = "Ctrl+" .. keyCombo
-      if not boundCombosCallback[keyComboCtrl] then
-        boundCombosCallback[keyComboCtrl] = function(k, c, ticks) prepareKeyCombo(keyComboCtrl, ticks) end
-        g_keyboard.bindKeyPress(keyComboCtrl, boundCombosCallback[keyComboCtrl], gameRootPanel)   
-      end
-    end
+    boundCombosCallback[keyCombo] = function() doKeyCombo(keyCombo) end
+    g_keyboard.bindKeyPress(keyCombo, boundCombosCallback[keyCombo])
   end
 
   if focus then
@@ -410,119 +565,74 @@ function addKeyCombo(keyCombo, keySettings, focus)
     currentHotkeys:ensureChildVisible(hotkeyLabel)
     updateHotkeyForm(true)
   end
-  configValueChanged = true
 end
 
-function prepareKeyCombo(keyCombo, ticks)
-    local hotKey = hotkeyList[keyCombo]
-    if (keyCombo:lower():find("ctrl") and not hotKey) or (hotKey and hotKey.itemId == nil and (not hotKey.value or #hotKey.value == 0) and not hotKey.action) then
-      keyCombo = keyCombo:gsub("Ctrl%+", "")
-      keyCombo = keyCombo:gsub("ctrl%+", "")
-      hotKey = hotkeyList[keyCombo]
-    end
-    if not hotKey then
-      return
-    end
-    
-    if hotKey.itemId == nil and hotKey.action == nil then -- say
-      scheduleEvent(function() doKeyCombo(keyCombo, ticks >= 5) end, g_settings.getNumber('hotkeyDelay'))
-    else
-      doKeyCombo(keyCombo, ticks >= 5)
-    end
-end
-
-function doKeyCombo(keyCombo, repeated)
+function doKeyCombo(keyCombo)
   if not g_game.isOnline() then return end
-  if modules.game_console and modules.game_console.isChatEnabled() then
-    if keyCombo:len() == 1 then 
-      return
-    end
-  end
-  if modules.game_walking then
-    modules.game_walking.checkTurn()
-  end
-  
   local hotKey = hotkeyList[keyCombo]
   if not hotKey then return end
-
-  local hotkeyDelay = 100  
-  if hotKey.hotkeyDelayTo == nil or g_clock.millis() > hotKey.hotkeyDelayTo + hotkeyDelay then
-    hotkeyDelay = 200 -- for first use
-  end
-  if hotKey.hotkeyDelayTo ~= nil and g_clock.millis() < hotKey.hotkeyDelayTo then
-    return
-  end
-  if hotKey.action then
-    executeExtraHotkey(hotKey.action, repeated)  
-  elseif hotKey.itemId == nil then
+  if hotKey.itemId == nil then
     if not hotKey.value or #hotKey.value == 0 then return end
     if hotKey.autoSend then
       modules.game_console.sendMessage(hotKey.value)
     else
       modules.game_console.setTextEditText(hotKey.value)
     end
-    hotKey.hotkeyDelayTo = g_clock.millis() + hotkeyDelay
   elseif hotKey.useType == HOTKEY_MANAGER_USE then
-    if g_game.getClientVersion() < 780 then
+    if g_game.getProtocolVersion() > 760 or hotKey.subType then
       local item = g_game.findPlayerItem(hotKey.itemId, hotKey.subType or -1)
-      if item then
+      if (item) then
         g_game.use(item)
       end
     else
       g_game.useInventoryItem(hotKey.itemId)
     end
-    hotKey.hotkeyDelayTo = g_clock.millis() + hotkeyDelay
   elseif hotKey.useType == HOTKEY_MANAGER_USEONSELF then
-    if g_game.getClientVersion() < 780 then
+    if g_game.getProtocolVersion() < 780 or hotKey.subType then
       local item = g_game.findPlayerItem(hotKey.itemId, hotKey.subType or -1)
       if item then
         g_game.useWith(item, g_game.getLocalPlayer())
       end
     else
-      g_game.useInventoryItemWith(hotKey.itemId, g_game.getLocalPlayer(), hotKey.subType or -1)
+      g_game.useInventoryItemWith(hotKey.itemId, g_game.getLocalPlayer())
     end
-    hotKey.hotkeyDelayTo = g_clock.millis() + hotkeyDelay
   elseif hotKey.useType == HOTKEY_MANAGER_USEONTARGET then
     local attackingCreature = g_game.getAttackingCreature()
     if not attackingCreature then
       local item = Item.create(hotKey.itemId)
-      if g_game.getClientVersion() < 780 then
+      if g_game.getProtocolVersion() > 760 or hotKey.subType then
         local tmpItem = g_game.findPlayerItem(hotKey.itemId, hotKey.subType or -1)
         if not tmpItem then return end
         item = tmpItem
       end
 
-      modules.game_interface.startUseWith(item, hotKey.subType or - 1)
+      modules.game_interface.startUseWith(item)
       return
     end
 
     if not attackingCreature:getTile() then return end
-    if g_game.getClientVersion() < 780 then
+    if g_game.getProtocolVersion() > 760 or hotKey.subType then
       local item = g_game.findPlayerItem(hotKey.itemId, hotKey.subType or -1)
       if item then
-        g_game.useWith(item, attackingCreature, hotKey.subType or -1)
+        g_game.useWith(item, attackingCreature)
       end
     else
-      g_game.useInventoryItemWith(hotKey.itemId, attackingCreature, hotKey.subType or -1)
+      g_game.useInventoryItemWith(hotKey.itemId, attackingCreature)
     end
-    hotKey.hotkeyDelayTo = g_clock.millis() + hotkeyDelay
   elseif hotKey.useType == HOTKEY_MANAGER_USEWITH then
     local item = Item.create(hotKey.itemId)
-    if g_game.getClientVersion() < 780 then
+    if g_game.getProtocolVersion() < 780 or hotKey.subType then
       local tmpItem = g_game.findPlayerItem(hotKey.itemId, hotKey.subType or -1)
       if not tmpItem then return true end
       item = tmpItem
     end
-    modules.game_interface.startUseWith(item, hotKey.subType or - 1)
+    modules.game_interface.startUseWith(item)
   end
 end
 
 function updateHotkeyLabel(hotkeyLabel)
   if not hotkeyLabel then return end
-  if hotkeyLabel.action ~= nil then  
-    hotkeyLabel:setText(tr('%s: (Action: %s)', hotkeyLabel.keyCombo, getActionDescription(hotkeyLabel.action)))
-    hotkeyLabel:setColor(HotkeyColors.extraAction)    
-  elseif hotkeyLabel.useType == HOTKEY_MANAGER_USEONSELF then
+  if hotkeyLabel.useType == HOTKEY_MANAGER_USEONSELF then
     hotkeyLabel:setText(tr('%s: (use object on yourself)', hotkeyLabel.keyCombo))
     hotkeyLabel:setColor(HotkeyColors.itemUseSelf)
   elseif hotkeyLabel.useType == HOTKEY_MANAGER_USEONTARGET then
@@ -549,22 +659,7 @@ function updateHotkeyLabel(hotkeyLabel)
 end
 
 function updateHotkeyForm(reset)
-  configValueChanged = true
-  if hotkeysWindow.action then
-    if currentHotkeyLabel then
-      hotkeysWindow.action:enable()
-      if currentHotkeyLabel.action then
-        hotkeysWindow.action:setCurrentIndex(translateActionToActionComboboxIndex(currentHotkeyLabel.action), true)      
-      else
-        hotkeysWindow.action:setCurrentIndex(1, true)
-      end
-    else
-      hotkeysWindow.action:disable()    
-      hotkeysWindow.action:setCurrentIndex(1, true)
-    end
-  end
-  local hasCustomAction = hotkeysWindow.action and hotkeysWindow.action.currentIndex > 1
-  if currentHotkeyLabel and not hasCustomAction then
+  if currentHotkeyLabel then
     removeHotkeyButton:enable()
     if currentHotkeyLabel.itemId ~= nil then
       hotkeyText:clearText()
@@ -580,8 +675,11 @@ function updateHotkeyForm(reset)
       end
       if currentItemPreview:getItem():isMultiUse() then
         useOnSelf:enable()
+        useOnSelf:show()
         useOnTarget:enable()
+        useOnTarget:show()
         useWith:enable()
+        useWith:show()
         if currentHotkeyLabel.useType == HOTKEY_MANAGER_USEONSELF then
           useRadioGroup:selectWidget(useOnSelf)
         elseif currentHotkeyLabel.useType == HOTKEY_MANAGER_USEONTARGET then
@@ -590,14 +688,20 @@ function updateHotkeyForm(reset)
           useRadioGroup:selectWidget(useWith)
         end
       else
+        useOnSelf:hide()
         useOnSelf:disable()
         useOnTarget:disable()
+        useOnTarget:hide()
         useWith:disable()
+        useWith:hide()
         useRadioGroup:clearSelected()
       end
     else
+      useOnSelf:hide()
       useOnSelf:disable()
+      useOnTarget:hide()
       useOnTarget:disable()
+      useWith:hide()
       useWith:disable()
       useRadioGroup:clearSelected()
       hotkeyText:enable()
@@ -614,6 +718,9 @@ function updateHotkeyForm(reset)
       currentItemPreview:clearItem()
     end
   else
+    useOnSelf:hide()
+    useOnTarget:hide()
+    useWith:hide()
     removeHotkeyButton:disable()
     hotkeyText:disable()
     sendAutomatically:disable()
@@ -631,21 +738,10 @@ end
 
 function removeHotkey()
   if currentHotkeyLabel == nil then return end
-  local gameRootPanel = modules.game_interface.getRootPanel()
-  configValueChanged = true
-  g_keyboard.unbindKeyPress(currentHotkeyLabel.keyCombo, boundCombosCallback[currentHotkeyLabel.keyCombo], gameRootPanel)
+  g_keyboard.unbindKeyPress(currentHotkeyLabel.keyCombo, boundCombosCallback[currentHotkeyLabel.keyCombo])
   boundCombosCallback[currentHotkeyLabel.keyCombo] = nil
   currentHotkeyLabel:destroy()
   currentHotkeyLabel = nil
-end
-
-function updateHotkeyAction()
-  if not hotkeysManagerLoaded then return end
-  if currentHotkeyLabel == nil then return end
-  configValueChanged = true
-  currentHotkeyLabel.action = translateActionComboboxIndexToAction(hotkeysWindow.action.currentIndex)
-  updateHotkeyLabel(currentHotkeyLabel)
-  updateHotkeyForm()
 end
 
 function onHotkeyTextChange(value)
@@ -655,7 +751,6 @@ function onHotkeyTextChange(value)
   if value == '' then
     currentHotkeyLabel.autoSend = false
   end
-  configValueChanged = true
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm()
 end
@@ -664,7 +759,6 @@ function onSendAutomaticallyChange(autoSend)
   if not hotkeysManagerLoaded then return end
   if currentHotkeyLabel == nil then return end
   if not currentHotkeyLabel.value or #currentHotkeyLabel.value == 0 then return end
-  configValueChanged = true
   currentHotkeyLabel.autoSend = autoSend
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm()
@@ -673,7 +767,6 @@ end
 function onChangeUseType(useTypeWidget)
   if not hotkeysManagerLoaded then return end
   if currentHotkeyLabel == nil then return end
-  configValueChanged = true
   if useTypeWidget == useOnSelf then
     currentHotkeyLabel.useType = HOTKEY_MANAGER_USEONSELF
   elseif useTypeWidget == useOnTarget then

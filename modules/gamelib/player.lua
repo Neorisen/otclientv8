@@ -133,7 +133,7 @@ function Player:getItemsCount(itemId)
   return count
 end
 
-function Player:hasState(state, states)
+function Player:hasState(_state, states)
   if not states then
     states = self:getStates()
   end
@@ -143,7 +143,7 @@ function Player:hasState(state, states)
     if pow > states then break end
 
     local states = bit32.band(states, pow)
-    if states == state then
+    if states == _state then
       return true
     end
   end

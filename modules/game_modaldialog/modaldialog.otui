@@ -5,7 +5,7 @@ ChoiceListLabel < Label
   focusable: true
 
   $focus:
-    background-color: #00000055
+    background-color: #ffffff22
     color: #ffffff
 
 ChoiceList < TextList
@@ -14,6 +14,7 @@ ChoiceList < TextList
   anchors.fill: parent
   anchors.top: prev.bottom
   anchors.bottom: next.top
+  padding: 1
   margin-top: 4
   margin-bottom: 10
   focusable: false
@@ -29,19 +30,14 @@ ChoiceScrollBar < VerticalScrollBar
   visible: false
 
 ModalButton < Button
-  text-auto-resize: true
-  margin-top: 2
-  margin-bottom: 2
-  margin-left: 2
-
-  $pressed:
-    text-offset: 0 0
+  width: 60
+  margin: 2
 
 ModalDialog < MainWindow
   id: modalDialog
   size: 280 97
-  &minimumWidth: 300
-  &maximumWidth: 600
+  &minimumWidth: 200
+  &maximumWidth: 500
   &minimumChoices: 4
   &maximumChoices: 10
 
@@ -49,7 +45,6 @@ ModalDialog < MainWindow
     id: messageLabel
     anchors.top: parent.top
     anchors.left: parent.left
-    anchors.right: parent.right
     text-align: left
     text-auto-resize: true
     text-wrap: true
@@ -60,10 +55,9 @@ ModalDialog < MainWindow
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: next.top
-    margin-bottom: 5
 
   Panel
-    id: buttonsPanel
+    id: buttonList
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: parent.bottom

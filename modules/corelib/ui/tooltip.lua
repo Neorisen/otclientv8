@@ -10,24 +10,13 @@ local function moveToolTip(first)
   if not first and (not toolTipLabel:isVisible() or toolTipLabel:getOpacity() < 0.1) then return end
 
   local pos = g_window.getMousePosition()
-  local windowSize = g_window.getSize()
-  local labelSize = toolTipLabel:getSize()
-
-  pos.x = pos.x + 1
   pos.y = pos.y + 1
-
-  if windowSize.width - (pos.x + labelSize.width) < 10 then
-    pos.x = pos.x - labelSize.width - 3
+  local xdif = g_window.getSize().width - (pos.x + toolTipLabel:getWidth())
+  if xdif < 10 then
+    pos.x = pos.x - toolTipLabel:getWidth() - 3
   else
     pos.x = pos.x + 10
   end
-
-  if windowSize.height - (pos.y + labelSize.height) < 10 then
-    pos.y = pos.y - labelSize.height - 3
-  else
-    pos.y = pos.y + 10
-  end
-
   toolTipLabel:setPosition(pos)
 end
 
@@ -62,6 +51,7 @@ function g_tooltip.init()
     toolTipLabel:setBackgroundColor('#111111cc')
     toolTipLabel:setTextAlign(AlignCenter)
     toolTipLabel:hide()
+    toolTipLabel.onMouseMove = function() moveToolTip() end
   end)
 end
 
@@ -88,18 +78,10 @@ function g_tooltip.display(text)
   toolTipLabel:enable()
   g_effects.fadeIn(toolTipLabel, 100)
   moveToolTip(true)
-  
-  connect(rootWidget, {
-    onMouseMove = moveToolTip,
-  })  
 end
 
 function g_tooltip.hide()
   g_effects.fadeOut(toolTipLabel, 100)
-  
-  disconnect(rootWidget, {
-    onMouseMove = moveToolTip,
-  })  
 end
 
 

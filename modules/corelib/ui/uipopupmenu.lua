@@ -8,7 +8,6 @@ function UIPopupMenu.create()
   local layout = UIVerticalLayout.create(menu)
   layout:setFitChildren(true)
   menu:setLayout(layout)
-  menu.isGameMenu = false
   return menu
 end
 
@@ -35,7 +34,6 @@ function UIPopupMenu:display(pos)
   rootWidget:addChild(self)
   self:setPosition(pos)
   self:grabMouse()
-  self:focus()
   --self:grabKeyboard()
   currentMenu = self
 end
@@ -46,11 +44,11 @@ function UIPopupMenu:onGeometryChange(oldRect, newRect)
   local ymax = parent:getY() + parent:getHeight()
   local xmax = parent:getX() + parent:getWidth()
   if newRect.y + newRect.height > ymax then
-    local newy = ymax - newRect.height
+    local newy = newRect.y - newRect.height
     if newy > 0 and newy + newRect.height < ymax then self:setY(newy) end
   end
   if newRect.x + newRect.width > xmax then
-    local newx = xmax - newRect.width
+    local newx = newRect.x - newRect.width
     if newx > 0 and newx + newRect.width < xmax then self:setX(newx) end
   end
   self:bindRectToParent()
@@ -58,8 +56,9 @@ end
 
 function UIPopupMenu:addOption(optionName, optionCallback, shortcut)
   local optionWidget = g_ui.createWidget(self:getStyleName() .. 'Button', self)
-  optionWidget.onClick = function(widget)
-    self:destroy()
+  local lastOptionWidget = self:getLastChild()
+  optionWidget.onClick = function(self)
+    self:getParent():destroy()
     optionCallback()
   end
   optionWidget:setText(optionName)
@@ -76,10 +75,6 @@ end
 
 function UIPopupMenu:addSeparator()
   g_ui.createWidget(self:getStyleName() .. 'Separator', self)
-end
-
-function UIPopupMenu:setGameMenu(state)
-  self.isGameMenu = state
 end
 
 function UIPopupMenu:onDestroy()
@@ -111,12 +106,4 @@ local function onRootGeometryUpdate()
     currentMenu:destroy()
   end
 end
-
-local function onGameEnd()
-  if currentMenu and currentMenu.isGameMenu then
-    currentMenu:destroy()
-  end
-end
-
-connect(rootWidget, { onGeometryChange = onRootGeometryUpdate })
-connect(g_game, { onGameEnd = onGameEnd } )
+connect(rootWidget, { onGeometryChange = onRootGeometryUpdate} )

@@ -2,7 +2,7 @@ Module
   name: corelib
   description: Contains core lua classes, functions and constants used by other modules
   author: OTClient team
-  website: https://github.com/edubart/otclient
+  website: www.otclient.info
   reloadable: false
 
   @onLoad: |
@@ -10,7 +10,6 @@ Module
     dofile 'string'
     dofile 'table'
     dofile 'bitwise'
-    dofile 'struct'
 
     dofile 'const'
     dofile 'util'
@@ -26,9 +25,3 @@ Module
 
     dofile 'inputmessage'
     dofile 'outputmessage'
-    dofile 'orderedtable'
-    
-    dofile 'base64'
-    dofile 'json'
-    dofile 'http'
-    

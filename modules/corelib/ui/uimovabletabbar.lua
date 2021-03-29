@@ -6,7 +6,7 @@ local function onTabClick(tab)
   tab.tabBar:selectTab(tab)
 end
 
-local function updateMargins(tabBar)
+local function updateMargins(tabBar, ignored)
   if #tabBar.tabs == 0 then return end
 
   local currentMargin = 0
@@ -17,19 +17,19 @@ local function updateMargins(tabBar)
 end
 
 local function updateNavigation(tabBar)
-  if tabBar.prevNavigation then
+  if prevNavigation then
     if #tabBar.preTabs > 0 or table.find(tabBar.tabs, tabBar.currentTab) ~= 1 then
-      tabBar.prevNavigation:enable()
+      prevNavigation:enable()
     else
-      tabBar.prevNavigation:disable()
+      prevNavigation:disable()
     end
   end
 
-  if tabBar.nextNavigation then
+  if nextNavigation then
     if #tabBar.postTabs > 0 or table.find(tabBar.tabs, tabBar.currentTab) ~= #tabBar.tabs then
-      tabBar.nextNavigation:enable()
+      nextNavigation:enable()
     else
-      tabBar.nextNavigation:disable()
+      nextNavigation:disable()
     end
   end
 end
@@ -94,6 +94,7 @@ local function updateTabs(tabBar)
   end
   updateNavigation(tabBar)
   updateMargins(tabBar)
+
   if not tabBar.currentTab and #tabBar.tabs > 0 then
     tabBar:selectTab(tabBar.tabs[1])
   end
@@ -186,7 +187,7 @@ local function onTabDragMove(tab, mousePos, mouseMoved)
 end
 
 local function tabBlink(tab, step)
-  local step = step or 0
+  step = step or 0
   tab:setOn(not tab:isOn())
 
   removeEvent(tab.blinkEvent)
@@ -215,19 +216,6 @@ function UIMoveableTabBar.create()
                               updateTabs(tabbar)
                             end
   return tabbar
-end
-
-function UIMoveableTabBar:onDestroy()
-  if self.prevNavigation then
-    self.prevNavigation:disable()
-  end
-
-  if self.nextNavigation then
-    self.nextNavigation:disable()
-  end
-
-  self.nextNavigation = nil
-  self.prevNavigation = nil
 end
 
 function UIMoveableTabBar:setContentWidget(widget)
@@ -308,17 +296,8 @@ function UIMoveableTabBar:moveTab(tab, units)
 end
 
 function UIMoveableTabBar:onStyleApply(styleName, styleNode)
-  if styleNode['movable'] then
-    self.tabsMoveable = styleNode['movable']
-  end
-  if styleNode['tab-spacing'] then
-    self:setTabSpacing(styleNode['tab-spacing'])
-  end
-end
-
-function UIMoveableTabBar:clearTabs()
-  while #self.tabs > 0 do
-    self:removeTab(self.tabs[#self.tabs])
+  if styleNode['moveable'] then
+    self.tabsMoveable = styleNode['moveable']
   end
 end
 
@@ -337,18 +316,19 @@ function UIMoveableTabBar:removeTab(tab)
   if tabTable == nil then
     return
   end
-  table.remove(tabTable, index)
+
   if self.currentTab == tab then
     self:selectPrevTab()
     if #self.tabs == 1 then
       self.currentTab = nil
     end
   end
+  table.remove(tabTable, index)
   if tab.blinkEvent then
     removeEvent(tab.blinkEvent)
   end
-  updateTabs(self)
   tab:destroy()
+  updateTabs(self)
 end
 
 function UIMoveableTabBar:getTab(text)
@@ -388,11 +368,6 @@ function UIMoveableTabBar:selectTab(tab)
   tab:setChecked(true)
   tab:setOn(false)
   tab.blinking = false
-
-  if tab.blinkEvent then
-    removeEvent(tab.blinkEvent)
-    tab.blinkEvent = nil
-  end
 
   local parent = tab:getParent()
   parent:focusChild(tab, MouseFocusReason)
@@ -492,14 +467,14 @@ function UIMoveableTabBar:getCurrentTab()
 end
 
 function UIMoveableTabBar:setNavigation(prevButton, nextButton)
-  self.prevNavigation = prevButton
-  self.nextNavigation = nextButton
+  prevNavigation = prevButton
+  nextNavigation = nextButton
 
-  if self.prevNavigation then
-    self.prevNavigation.onClick = function() self:selectPrevTab() end
+  if prevNavigation then
+    prevNavigation.onClick = function() self:selectPrevTab() end
   end
-  if self.nextNavigation then
-    self.nextNavigation.onClick = function() self:selectNextTab() end
+  if nextNavigation then
+    nextNavigation.onClick = function() self:selectNextTab() end
   end
   updateNavigation(self)
 end

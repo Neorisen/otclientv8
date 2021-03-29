@@ -28,10 +28,7 @@ local function calcValues(self)
     proportion = math.min(math.max(self.step, 1), range)/range
   end
 
-  local px = math.max(proportion * pxrange, 6)
-  if g_app.isMobile() then
-    px = math.max(proportion * pxrange, 24)  
-  end
+  local px = math.max(proportion * pxrange, 10)
   px = px - px % 2 + 1
 
   local offset = 0
@@ -129,8 +126,8 @@ end
 function UIScrollBar:onSetup()
   self.setupDone = true
   local sliderButton = self:getChildById('sliderButton')
-  g_mouse.bindAutoPress(self:getChildById('decrementButton'), function() self:onDecrement() end, 300)
-  g_mouse.bindAutoPress(self:getChildById('incrementButton'), function() self:onIncrement() end, 300)
+  g_mouse.bindAutoPress(self:getChildById('decrementButton'), function() self:decrement() end, 300)
+  g_mouse.bindAutoPress(self:getChildById('incrementButton'), function() self:increment() end, 300)
   g_mouse.bindPressMove(sliderButton, function(mousePos, mouseMoved) parseSliderPos(self, sliderButton, mousePos, mouseMoved) end)
   g_mouse.bindPress(sliderButton, function(mousePos, mouseButton) parseSliderPress(self, sliderButton, mousePos, mouseButton) end)
 
@@ -158,26 +155,6 @@ function UIScrollBar:onStyleApply(styleName, styleNode)
     elseif name == 'mouse-scroll' then
       self.mouseScroll = value
     end
-  end
-end
-
-function UIScrollBar:onDecrement()
-  if g_keyboard.isCtrlPressed() then
-    self:decrement(self.value)
-  elseif g_keyboard.isShiftPressed() then
-    self:decrement(10)
-  else
-    self:decrement()
-  end
-end
-
-function UIScrollBar:onIncrement()
-  if g_keyboard.isCtrlPressed() then
-    self:increment(self.maximum)
-  elseif g_keyboard.isShiftPressed() then
-    self:increment(10)
-  else
-    self:increment()
   end
 end
 
@@ -257,23 +234,19 @@ function UIScrollBar:onGeometryChange()
 end
 
 function UIScrollBar:onMouseWheel(mousePos, mouseWheel)
-  if not self.mouseScroll or not self:isOn() or self.disableScroll then
+  if not self.mouseScroll then
     return false
   end
   if mouseWheel == MouseWheelUp then
     if self.orientation == 'vertical' then
-      if self.value <= self.minimum then  return false end
       self:decrement()
     else
-      if self.value >= self.maximum then return false end
       self:increment()
     end
   else
     if self.orientation == 'vertical' then
-      if self.value >= self.maximum then return false end
       self:increment()
     else
-      if self.value <= self.minimum then  return false end
       self:decrement()
     end
   end

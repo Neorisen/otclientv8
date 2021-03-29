@@ -28,7 +28,6 @@ MiniWindow
   icon: /images/topbuttons/cooldowns
   @onClose: modules.game_cooldown.onMiniWindowClose()
   &save: true
-  &autoOpen: false
 
   MiniWindowContents
     SpellGroupIcon
@@ -97,5 +96,5 @@ MiniWindow
       anchors.top: groupIconSpecial.bottom
       anchors.left: parent.left
       anchors.right: parent.right
-      background-color: #00000022
+      background-color: #ffffff11
 

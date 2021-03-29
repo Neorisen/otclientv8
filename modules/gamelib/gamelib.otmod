@@ -2,7 +2,10 @@ Module
   name: gamelib
   description: Contains game related classes
   author: OTClient team
-  website: https://github.com/edubart/otclient
+  website: www.otclient.info
+
+  dependencies:
+    - game_things
 
   @onLoad: |
     dofile 'const'
@@ -16,7 +19,6 @@ Module
     dofile 'creature'
     dofile 'player'
     dofile 'market'
-    dofile 'textmessages'
     dofile 'thing'
     dofile 'spells'
 

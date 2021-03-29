@@ -2,21 +2,13 @@
 ProtocolLogin = extends(Protocol, "ProtocolLogin")
 
 LoginServerError = 10
-LoginServerTokenSuccess = 12
-LoginServerTokenError = 13
 LoginServerUpdate = 17
 LoginServerMotd = 20
 LoginServerUpdateNeeded = 30
-LoginServerSessionKey = 40
 LoginServerCharacterList = 100
 LoginServerExtendedCharacterList = 101
-LoginServerProxyList = 110
 
--- Since 10.76
-LoginServerRetry = 10
-LoginServerErrorNew = 11
-
-function ProtocolLogin:login(host, port, accountName, accountPassword, authenticatorToken, stayLogged)
+function ProtocolLogin:login(host, port, accountName, accountPassword)
   if string.len(host) == 0 or port == nil or port == 0 then
     signalcall(self.onLoginError, self, tr("You must enter a valid server address and port."))
     return
@@ -24,8 +16,6 @@ function ProtocolLogin:login(host, port, accountName, accountPassword, authentic
 
   self.accountName = accountName
   self.accountPassword = accountPassword
-  self.authenticatorToken = authenticatorToken
-  self.stayLogged = stayLogged
   self.connectCallback = self.sendLoginPacket
 
   self:connect(host, port)
@@ -39,34 +29,26 @@ function ProtocolLogin:sendLoginPacket()
   local msg = OutputMessage.create()
   msg:addU8(ClientOpcodes.ClientEnterAccount)
   msg:addU16(g_game.getOs())
-  if g_game.getCustomProtocolVersion() > 0 then
-    msg:addU16(g_game.getCustomProtocolVersion())  
-  else
-    msg:addU16(g_game.getProtocolVersion())
-  end
 
-  if g_game.getFeature(GameClientVersion) then
+  msg:addU16(g_game.getProtocolVersion())
+
+  if g_game.getProtocolVersion() >= 971 then
     msg:addU32(g_game.getClientVersion())
   end
 
-  if g_game.getFeature(GameContentRevision) then
-    msg:addU16(g_things.getContentRevision())
-    msg:addU16(0)
-  else
-    msg:addU32(g_things.getDatSignature())
-  end
+  msg:addU32(g_things.getDatSignature())
   msg:addU32(g_sprites.getSprSignature())
   msg:addU32(PIC_SIGNATURE)
 
-  if g_game.getFeature(GamePreviewState) then
-    msg:addU8(0)
+  if g_game.getProtocolVersion() >= 971 then
+    msg:addU8(0) -- clientType
   end
 
   local offset = msg:getMessageSize()
-  if g_game.getFeature(GameLoginPacketEncryption) then
+
+  if g_game.getProtocolVersion() >= 770 then
     -- first RSA byte must be 0
     msg:addU8(0)
-
     -- xtea key
     self:generateXteaKey()
     local xteaKey = self:getXteaKey()
@@ -87,60 +69,13 @@ function ProtocolLogin:sendLoginPacket()
   if self.getLoginExtendedData then
     local data = self:getLoginExtendedData()
     msg:addString(data)
-  else
-    msg:addString("OTCv8")
-    local version = g_app.getVersion():split(" ")[1]:gsub("%.", "")
-    if version:len() == 2 then
-      version = version .. "0" 
-    end
-    msg:addU16(tonumber(version))
   end
 
   local paddingBytes = g_crypt.rsaGetSize() - (msg:getMessageSize() - offset)
   assert(paddingBytes >= 0)
-  for i = 1, paddingBytes do
-    msg:addU8(math.random(0, 0xff))
-  end
-
-  if g_game.getFeature(GameLoginPacketEncryption) then
+  msg:addPaddingBytes(paddingBytes, 0)
+  if g_game.getProtocolVersion() >= 770 then
     msg:encryptRsa()
-  end
-
-  if g_game.getFeature(GameOGLInformation) then
-    msg:addU8(1) --unknown
-    msg:addU8(1) --unknown
-
-    if g_game.getClientVersion() >= 1072 then
-      msg:addString(string.format('%s %s', g_graphics.getVendor(), g_graphics.getRenderer()))
-    else
-      msg:addString(g_graphics.getRenderer())
-    end
-    msg:addString(g_graphics.getVersion())
-  end
-
-  -- add RSA encrypted auth token
-  if g_game.getFeature(GameAuthenticator) then
-    offset = msg:getMessageSize()
-
-    -- first RSA byte must be 0
-    msg:addU8(0)
-    msg:addString(self.authenticatorToken)
-
-    if g_game.getFeature(GameSessionKey) then
-      msg:addU8(booleantonumber(self.stayLogged))
-    end
-
-    paddingBytes = g_crypt.rsaGetSize() - (msg:getMessageSize() - offset)
-    assert(paddingBytes >= 0)
-    for i = 1, paddingBytes do
-      msg:addU8(math.random(0, 0xff))
-    end
-
-    msg:encryptRsa()
-  end
-
-  if g_game.getFeature(GamePacketSizeU32) then
-    self:enableBigPackets()
   end
 
   if g_game.getFeature(GameProtocolChecksum) then
@@ -148,7 +83,7 @@ function ProtocolLogin:sendLoginPacket()
   end
 
   self:send(msg)
-  if g_game.getFeature(GameLoginPacketEncryption) then
+  if g_game.getProtocolVersion() >= 770 then
     self:enableXteaEncryption()
   end
   self:recv()
@@ -163,39 +98,19 @@ end
 function ProtocolLogin:onRecv(msg)
   while not msg:eof() do
     local opcode = msg:getU8()
-    if opcode == LoginServerErrorNew then
-      self:parseError(msg)
-    elseif opcode == LoginServerError then
+    if opcode == LoginServerError then
       self:parseError(msg)
     elseif opcode == LoginServerMotd then
       self:parseMotd(msg)
     elseif opcode == LoginServerUpdateNeeded then
       signalcall(self.onLoginError, self, tr("Client needs update."))
-    elseif opcode == LoginServerTokenSuccess then
-      local unknown = msg:getU8()
-    elseif opcode == LoginServerTokenError then
-      -- TODO: prompt for token here
-      local unknown = msg:getU8()
-      signalcall(self.onLoginError, self, tr("Invalid authentification token."))
     elseif opcode == LoginServerCharacterList then
       self:parseCharacterList(msg)
     elseif opcode == LoginServerExtendedCharacterList then
       self:parseExtendedCharacterList(msg)
     elseif opcode == LoginServerUpdate then
       local signature = msg:getString()
-      signalcall(self.onUpdateNeeded, self, signature)      
-    elseif opcode == LoginServerSessionKey then
-      self:parseSessionKey(msg)
-    elseif opcode == LoginServerProxyList then
-      local proxies = {}
-      local proxiesCount = msg:getU8()
-      for i=1, proxiesCount do
-        local host = msg:getString()
-        local port = msg:getU16()
-        local priority = msg:getU16()        
-        table.insert(proxies, {host=host, port=port, priority=priority})
-      end      
-      signalcall(self.onProxyList, self, proxies)
+      signalcall(self.onUpdateNeeded, self, signature)
     else
       self:parseOpcode(opcode, msg)
     end
@@ -213,15 +128,10 @@ function ProtocolLogin:parseMotd(msg)
   signalcall(self.onMotd, self, motd)
 end
 
-function ProtocolLogin:parseSessionKey(msg)
-  local sessionKey = msg:getString()
-  signalcall(self.onSessionKey, self, sessionKey)
-end
-
 function ProtocolLogin:parseCharacterList(msg)
   local characters = {}
 
-  if g_game.getClientVersion() > 1010 then
+  if g_game.getProtocolVersion() > 1010 then
     local worlds = {}
 
     local worldsCount = msg:getU8()
@@ -231,7 +141,7 @@ function ProtocolLogin:parseCharacterList(msg)
       world.worldName = msg:getString()
       world.worldIp = msg:getString()
       world.worldPort = msg:getU16()
-      world.previewState = msg:getU8()
+      msg:getU8() -- unknow byte?
       worlds[worldId] = world
     end
 
@@ -243,7 +153,6 @@ function ProtocolLogin:parseCharacterList(msg)
       character.worldName = worlds[worldId].worldName
       character.worldIp = worlds[worldId].worldIp
       character.worldPort = worlds[worldId].worldPort
-      character.previewState = worlds[worldId].previewState
       characters[i] = character
     end
 
@@ -256,8 +165,8 @@ function ProtocolLogin:parseCharacterList(msg)
       character.worldIp = iptostring(msg:getU32())
       character.worldPort = msg:getU16()
 
-      if g_game.getFeature(GamePreviewState) then
-        character.previewState = msg:getU8()
+      if g_game.getProtocolVersion() >= 971 then
+        character.unknown = msg:getU8()
       end
 
       characters[i] = character
@@ -265,20 +174,7 @@ function ProtocolLogin:parseCharacterList(msg)
   end
 
   local account = {}
-  if g_game.getProtocolVersion() > 1077 then
-    account.status = msg:getU8()
-    account.subStatus = msg:getU8()
-
-    account.premDays = msg:getU32()
-    if account.premDays ~= 0 and account.premDays ~= 65535 then
-      account.premDays = math.floor((account.premDays - os.time()) / 86400)
-    end
-  else
-    account.status = AccountStatus.Ok
-    account.premDays = msg:getU16()
-    account.subStatus = account.premDays > 0 and SubscriptionStatus.Premium or SubscriptionStatus.Free
-  end
-
+  account.premDays = msg:getU16()
   signalcall(self.onCharacterList, self, characters, account)
 end
 

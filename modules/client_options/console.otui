@@ -1,4 +1,4 @@
-OptionPanel
+Panel
   OptionCheckBox
     id: showInfoMessagesInConsole
     !text: tr('Show info messages in console')

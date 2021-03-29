@@ -3,8 +3,8 @@ MessageSettings = {
   consoleRed      = { color = TextColors.red,    consoleTab='Default' },
   consoleOrange   = { color = TextColors.orange, consoleTab='Default' },
   consoleBlue     = { color = TextColors.blue,   consoleTab='Default' },
-  centerRed       = { color = TextColors.red,    consoleTab='Server Log', screenTarget='lowCenterLabel' },
-  centerGreen     = { color = TextColors.green,  consoleTab='Server Log', screenTarget='highCenterLabel',   consoleOption='showInfoMessagesInConsole' },
+  centerRed       = { color = TextColors.red,    consoleTab='Default', screenTarget='lowCenterLabel' },
+  centerGreen     = { color = TextColors.green,  consoleTab='Default', screenTarget='highCenterLabel',   consoleOption='showInfoMessagesInConsole' },
   centerWhite     = { color = TextColors.white,  consoleTab='Server Log', screenTarget='middleCenterLabel', consoleOption='showEventMessagesInConsole' },
   bottomWhite     = { color = TextColors.white,  consoleTab='Server Log', screenTarget='statusLabel',       consoleOption='showEventMessagesInConsole' },
   status          = { color = TextColors.white,  consoleTab='Server Log', screenTarget='statusLabel',       consoleOption='showStatusMessagesInConsole' },
@@ -44,6 +44,7 @@ MessageTypes = {
   [MessageModes.Party] = MessageSettings.centerGreen,
   [MessageModes.PartyManagement] = MessageSettings.centerWhite,
   [MessageModes.TutorialHint] = MessageSettings.centerWhite,
+  [MessageModes.Market] = MessageSettings.centerWhite,
   [MessageModes.BeyondLast] = MessageSettings.centerWhite,
   [MessageModes.Report] = MessageSettings.consoleRed,
   [MessageModes.HotkeyUse] = MessageSettings.centerGreen,
@@ -54,33 +55,54 @@ MessageTypes = {
 messagesPanel = nil
 
 function init()
-  for messageMode, _ in pairs(MessageTypes) do
-    registerMessageMode(messageMode, displayMessage)
-  end
-
+  connect(g_game, 'onTextMessage', displayMessage)
   connect(g_game, 'onGameEnd', clearMessages)
   messagesPanel = g_ui.loadUI('textmessage', modules.game_interface.getRootPanel())
 end
 
 function terminate()
-  for messageMode, _ in pairs(MessageTypes) do
-    unregisterMessageMode(messageMode, displayMessage)
-  end
-
+  disconnect(g_game, 'onTextMessage', displayMessage)
   disconnect(g_game, 'onGameEnd', clearMessages)
   clearMessages()
   messagesPanel:destroy()
 end
 
 function calculateVisibleTime(text)
-  return math.max(#text * 50, 3000)
+  return math.max(#text * 100, 4000)
+end
+
+function displayLootMessage(text, msgtype)
+  if not g_game.isOnline() then return end
+
+  if not msgtype then
+    perror('unhandled onTextMessage message mode ' .. mode .. ': ' .. text)
+    return
+  end
+
+  if msgtype == MessageSettings.none then return end
+
+  if msgtype.consoleTab ~= nil and (msgtype.consoleOption == nil or modules.client_options.getOption(msgtype.consoleOption)) then
+    modules.game_console.addText(text, msgtype, tr(msgtype.consoleTab))
+    --TODO move to game_console
+  end
+
+  if msgtype.screenTarget then
+    local label = messagesPanel:recursiveGetChildById(msgtype.screenTarget)
+    label:setText(text)
+    label:setColor(msgtype.color)
+    label:setVisible(true)
+    removeEvent(label.hideEvent)
+    label.hideEvent = scheduleEvent(function() label:setVisible(false) end, calculateVisibleTime(text))
+  end
 end
 
 function displayMessage(mode, text)
   if not g_game.isOnline() then return end
 
   local msgtype = MessageTypes[mode]
+
   if not msgtype then
+    perror('unhandled onTextMessage message mode ' .. mode .. ': ' .. text)
     return
   end
 

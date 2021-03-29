@@ -22,15 +22,10 @@ local function getKeyCode(key)
   end
 end
 
-function retranslateKeyComboDesc(keyComboDesc)
+local function retranslateKeyComboDesc(keyComboDesc)
   if keyComboDesc == nil then
     error('Unable to translate key combo \'' .. keyComboDesc .. '\'')
   end
-
-  if type(keyComboDesc) == 'number' then
-    keyComboDesc = tostring(keyComboDesc)
-  end
-
   local keyCombo = {}
   for i,currentKeyDesc in ipairs(keyComboDesc:split('+')) do
     for keyCode, keyDesc in pairs(KeyCodeDescs) do
@@ -185,31 +180,6 @@ function g_keyboard.isKeyPressed(key)
     key = getKeyCode(key)
   end
   return g_window.isKeyPressed(key)
-end
-
-function g_keyboard.areKeysPressed(keyComboDesc)
-  for i,currentKeyDesc in ipairs(keyComboDesc:split('+')) do
-    for keyCode, keyDesc in pairs(KeyCodeDescs) do
-      if keyDesc:lower() == currentKeyDesc:trim():lower() then
-        if keyDesc:lower() == "ctrl" then 
-          if not g_keyboard.isCtrlPressed() then
-            return false
-          end
-        elseif keyDesc:lower() == "shift" then 
-          if not g_keyboard.isShiftPressed() then
-            return false
-          end              
-        elseif keyDesc:lower() == "alt" then 
-          if not g_keyboard.isAltPressed() then
-            return false
-          end              
-        elseif not g_window.isKeyPressed(keyCode) then
-          return false
-        end
-      end
-    end
-  end
-  return true
 end
 
 function g_keyboard.isKeySetPressed(keys, all)

@@ -9,6 +9,20 @@ function UIMiniWindowContainer.create()
   return container
 end
 
+function UIMiniWindowContainer:getEmptySpaceHeight()
+  local sumHeight = 0
+  local children = self:getChildren()
+
+  for i=1,#children do
+    if children[i]:isVisible() then
+      sumHeight = sumHeight + children[i]:getHeight()
+    end
+  end
+  local selfHeight = self:getHeight() - (self:getPaddingTop() + self:getPaddingBottom())
+
+  return selfHeight - sumHeight
+end
+
 -- TODO: connect to window onResize event
 -- TODO: try to resize another widget?
 -- TODO: try to find another panel?
@@ -62,20 +76,6 @@ function UIMiniWindowContainer:fitAll(noRemoveChild)
     end
   end
 
-  -- try to remove save widget, not forceOpen
-  for i=#children,1,-1 do
-    if sumHeight <= selfHeight then
-      break
-    end
-
-    local child = children[i]
-    if child ~= noRemoveChild and child:isVisible() and not child.forceOpen then
-      local childHeight = child:getHeight()
-      sumHeight = sumHeight - childHeight
-      table.insert(removeChildren, child)
-    end
-  end
-
   -- try to remove save widget
   for i=#children,1,-1 do
     if sumHeight <= selfHeight then
@@ -83,8 +83,8 @@ function UIMiniWindowContainer:fitAll(noRemoveChild)
     end
 
     local child = children[i]
-    if child ~= noRemoveChild and child:isVisible() then
-      local childHeight = child:getHeight() - 50
+    if child ~= noRemoveChild then
+      local childHeight = child:getHeight()
       sumHeight = sumHeight - childHeight
       table.insert(removeChildren, child)
     end
@@ -92,9 +92,9 @@ function UIMiniWindowContainer:fitAll(noRemoveChild)
 
   -- close widgets
   for i=1,#removeChildren do
-    if removeChildren[i].forceOpen then
-      removeChildren[i]:minimize(true)
-    else
+    signalcall(removeChildren[i].onRemoveFromContainer, removeChildren[i])
+
+    if removeChildren[i]:getParent():getId() == self:getId() then
       removeChildren[i]:close()
     end
   end
@@ -121,18 +121,6 @@ function UIMiniWindowContainer:onDrop(widget, mousePos)
     self:fitAll(widget)
     return true
   end
-end
-
-function UIMiniWindowContainer:moveTo(newPanel)
-  if not newPanel or newPanel == self then
-    return
-  end
-  local children = self:getChildByIndex(1)
-  while children do
-    newPanel:addChild(children)
-    children = self:getChildByIndex(1)
-  end
-  newPanel:fitAll()
 end
 
 function UIMiniWindowContainer:swapInsert(widget, index)
@@ -168,15 +156,7 @@ function UIMiniWindowContainer:scheduleInsert(widget, index)
         local placed = false
         for nIndex,nWidget in pairs(self.scheduledWidgets) do
           if nIndex - 1 <= self:getChildCount() then
-            local oldParent = nWidget:getParent()
-            if oldParent ~= self then
-              if oldParent then
-                oldParent:removeChild(nWidget)
-              end
-              self:insertChild(nIndex, nWidget)
-            else
-              self:moveChildToIndex(nWidget, nIndex)
-            end
+            self:insertChild(nIndex, nWidget)
             self.scheduledWidgets[nIndex] = nil
             placed = true
             break
@@ -184,6 +164,7 @@ function UIMiniWindowContainer:scheduleInsert(widget, index)
         end
         if not placed then break end
       end
+
     end
   end
 end
@@ -197,8 +178,6 @@ function UIMiniWindowContainer:order()
   for i=1,#children do
     if children[i].miniIndex then
       self:swapInsert(children[i], children[i].miniIndex)
-    elseif children[i].autoOpen then
-      self:swapInsert(children[i], children[i].autoOpen)    
     end
   end
 end
@@ -213,8 +192,4 @@ function UIMiniWindowContainer:saveChildren()
       ignoreIndex = ignoreIndex + 1
     end
   end
-end
-
-function UIMiniWindowContainer:onGeometryChange()
-  self:fitAll()
 end

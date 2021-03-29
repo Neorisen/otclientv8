@@ -2,7 +2,7 @@ Module
   name: game_cooldown
   description: Spellcooldowns
   author: OTClient team
-  website: https://github.com/edubart/otclient
+  website: www.otclient.info
   sandboxed: true
   scripts: [ cooldown ]
   @onLoad: init()

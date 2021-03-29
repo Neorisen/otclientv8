@@ -3,7 +3,7 @@ SpeakTypesSettings = {
   say = { speakType = MessageModes.Say, color = '#FFFF00' },
   whisper = { speakType = MessageModes.Whisper, color = '#FFFF00' },
   yell = { speakType = MessageModes.Yell, color = '#FFFF00' },
-  broadcast = { speakType = MessageModes.GamemasterBroadcast, color = '#F55E5E' },
+  broadcast = { speakType = MessageModes.GamemasterPrivateFrom, color = '#F55E5E' },
   private = { speakType = MessageModes.PrivateTo, color = '#5FF7F7', private = true },
   privateRed = { speakType = MessageModes.GamemasterTo, color = '#F55E5E', private = true },
   privatePlayerToPlayer = { speakType = MessageModes.PrivateTo, color = '#9F9DFD', private = true },
@@ -12,7 +12,7 @@ SpeakTypesSettings = {
   channelYellow = { speakType = MessageModes.Channel, color = '#FFFF00' },
   channelWhite = { speakType = MessageModes.ChannelManagement, color = '#FFFFFF' },
   channelRed = { speakType = MessageModes.GamemasterChannel, color = '#F55E5E' },
-  channelOrange = { speakType = MessageModes.ChannelHighlight, color = '#F6A731' },
+  channelOrange = { speakType = MessageModes.ChannelHighlight, color = '#FE6500' },
   monsterSay = { speakType = MessageModes.MonsterSay, color = '#FE6500', hideInConsole = true},
   monsterYell = { speakType = MessageModes.MonsterYell, color = '#FE6500', hideInConsole = true},
   rvrAnswerFrom = { speakType = MessageModes.RVRAnswer, color = '#FE6500' },
@@ -38,7 +38,6 @@ SpeakTypes = {
   [MessageModes.RVRChannel] = SpeakTypesSettings.channelWhite,
   [MessageModes.RVRContinue] = SpeakTypesSettings.rvrContinue,
   [MessageModes.RVRAnswer] = SpeakTypesSettings.rvrAnswerFrom,
-  [MessageModes.NpcFromStartBlock] = SpeakTypesSettings.privateNpcToPlayer,
 
   -- ignored types
   [MessageModes.Spell] = SpeakTypesSettings.none,
@@ -52,13 +51,6 @@ SayModes = {
   [3] = { speakTypeDesc = 'yell', icon = '/images/game/console/yell' }
 }
 
-ChannelEventFormats = {
-  [ChannelEvent.Join] = '%s joined the channel.',
-  [ChannelEvent.Leave] = '%s left the channel.',
-  [ChannelEvent.Invite] = '%s has been invited to the channel.',
-  [ChannelEvent.Exclude] = '%s has been removed from the channel.',
-}
-
 MAX_HISTORY = 500
 MAX_LINES = 100
 HELP_CHANNEL = 9
@@ -67,7 +59,6 @@ consolePanel = nil
 consoleContentPanel = nil
 consoleTabBar = nil
 consoleTextEdit = nil
-consoleToggleChat = nil
 channels = nil
 channelsWindow = nil
 communicationWindow = nil
@@ -82,8 +73,6 @@ violationWindow = nil
 violationReportTab = nil
 ignoredChannels = {}
 filters = {}
-
-floatingMode = false
 
 local communicationSettings = {
   useIgnoreList = true,
@@ -100,42 +89,39 @@ function init()
     onTalk = onTalk,
     onChannelList = onChannelList,
     onOpenChannel = onOpenChannel,
-    onCloseChannel = onCloseChannel,
-    onChannelEvent = onChannelEvent,
     onOpenPrivateChannel = onOpenPrivateChannel,
     onOpenOwnPrivateChannel = onOpenOwnPrivateChannel,
+    onCloseChannel = onCloseChannel,
     onRuleViolationChannel = onRuleViolationChannel,
     onRuleViolationRemove = onRuleViolationRemove,
     onRuleViolationCancel = onRuleViolationCancel,
     onRuleViolationLock = onRuleViolationLock,
     onGameStart = online,
-    onGameEnd = offline,
+    onGameEnd = offline
   })
 
+  loadLootList()
   consolePanel = g_ui.loadUI('console', modules.game_interface.getBottomPanel())
   consoleTextEdit = consolePanel:getChildById('consoleTextEdit')
   consoleContentPanel = consolePanel:getChildById('consoleContentPanel')
   consoleTabBar = consolePanel:getChildById('consoleTabBar')
   consoleTabBar:setContentWidget(consoleContentPanel)
+  consoleTabBar:setTabSpacing(-1)
   channels = {}
-    
-  consolePanel.onDragEnter = onDragEnter
-  consolePanel.onDragLeave = onDragLeave
-  consolePanel.onDragMove = onDragMove
-  consoleTabBar.onDragEnter = onDragEnter
-  consoleTabBar.onDragLeave = onDragLeave
-  consoleTabBar.onDragMove = onDragMove
-  
+
   consolePanel.onKeyPress = function(self, keyCode, keyboardModifiers)
     if not (keyboardModifiers == KeyboardCtrlModifier and keyCode == KeyC) then return false end
 
     local tab = consoleTabBar:getCurrentTab()
     if not tab then return false end
 
-    local selection = tab.tabPanel:getChildById('consoleBuffer').selectionText
-    if not selection then return false end
+    local consoleBuffer = tab.tabPanel:getChildById('consoleBuffer')
+    if not consoleBuffer then return false end
 
-    g_window.setClipboardText(selection)
+    local consoleLabel = consoleBuffer:getFocusedChild()
+    if not consoleLabel or not consoleLabel:hasSelection() then return false end
+
+    g_window.setClipboardText(consoleLabel:getSelection())
     return true
   end
 
@@ -151,10 +137,9 @@ function init()
   consoleTabBar.onTabChange = onTabChange
 
   -- tibia like hotkeys
-  local gameRootPanel = modules.game_interface.getRootPanel()
-  g_keyboard.bindKeyDown('Ctrl+O', g_game.requestChannels, gameRootPanel)
-  g_keyboard.bindKeyDown('Ctrl+E', removeCurrentTab, gameRootPanel)
-  g_keyboard.bindKeyDown('Ctrl+H', openHelp, gameRootPanel)
+  g_keyboard.bindKeyDown('Ctrl+O', g_game.requestChannels)
+  g_keyboard.bindKeyDown('Ctrl+E', removeCurrentTab)
+  g_keyboard.bindKeyDown('Ctrl+H', openHelp)
 
   consoleToggleChat = consolePanel:getChildById('toggleChat')
   load()
@@ -164,24 +149,61 @@ function init()
   end
 end
 
-function clearSelection(consoleBuffer)
-  for _,label in pairs(consoleBuffer:getChildren()) do
-    label:clearSelection()
-  end
-  consoleBuffer.selectionText = nil
-  consoleBuffer.selection = nil
-end
+function loadLootList()
+  -- moje zabawy Loot Filterem
+  local count = 1
+  local itemName = ""
+  local textColor = ""
+  local itemsList = {}
+  local errCount = 0
+  local tempSpeakType = SpeakTypesSettings.channelOrange.speakType
+  itemsToLoot = {}
 
-function selectAll(consoleBuffer)
-  clearSelection(consoleBuffer)
-  if consoleBuffer:getChildCount() > 0 then
-    local text = {}
-    for _,label in pairs(consoleBuffer:getChildren()) do
-      label:selectAll()
-      table.insert(text, label:getSelection())
+  c_dir = g_resources.getWorkDir() .. 'lootlist.txt'
+  --print('directory: ' .. c_dir)
+  myFile = io.open(c_dir, "r")
+  
+  if myFile ~= nil then
+    if myFile:seek('end') > 0 then
+      for line in io.lines(c_dir) do
+        print("Dodalem do loota:")
+        if line:len() > 3 then
+          if line:find(',') then
+            --itemsToLoot[count] = line:split(",")
+            itemsList = line:split(",")
+            if itemsList[1]:len() > 0 and itemsList[2]:len() > 0 and itemsList[3]:len() > 1 then
+              if string.find(itemsList[3], "#") == nil then
+                print("Blad w ladowaniu itemslist.txt : line " .. line .. ".")
+              end
+              if itemsList[1]:find('%%') then
+                itemsList[1] = itemsList[1]:gsub('%%', '%%%%')
+              end
+              itemsToLoot[count] = {
+                itemName = string.lower(itemsList[1]:trim()),
+                itemInfo = itemsList[2]:trim(),
+                color = itemsList[3]:trim() 
+              }
+              print(itemsToLoot[count].itemName .. " -> " .. itemsToLoot[count].itemInfo .. " -> " .. itemsToLoot[count].color)
+            end
+          else
+            errCount = errCount + 1
+            print('Blad nr ' .. errCount .. ' w linijce: ' ..line)
+          end
+        else
+          errCount = errCount + 1
+          print('Blad nr ' .. errCount .. ':' .. 'Linia jest zbyt krotka.')
+        end
+        count = count + 1
+      end
+      if count == 1 then
+        enableFilter = false
+        print('Wystapil problem z ladowaniem pliku lootlist.txt.')
+      end
     end
-    consoleBuffer.selectionText = table.concat(text, '\n')
-    consoleBuffer.selection = { first = consoleBuffer:getChildIndex(consoleBuffer:getFirstChild()), last = consoleBuffer:getChildIndex(consoleBuffer:getLastChild()) }
+    myFile = io.close(myFile)
+  else
+    print('Stworz plik lootlist.txt w glownym folderze OTClienta!')
+    enableFilter = false
   end
 end
 
@@ -193,68 +215,44 @@ function toggleChat()
   end
 end
 
-function enableChat(temporarily)
-  if g_app.isMobile() then return end
-  if consoleToggleChat:isChecked() then
-    return consoleToggleChat:setChecked(false)
-  end
-  if not temporarily then
-    modules.client_options.setOption("wsadWalking", false)
-  end
+function enableChat()
+  local gameInterface = modules.game_interface
 
   consoleTextEdit:setVisible(true)
   consoleTextEdit:setText("")
-  consoleTextEdit:focus()
 
-  local gameRootPanel = modules.game_interface.getRootPanel()
-  g_keyboard.unbindKeyDown("Enter", gameRootPanel)
-  
-  if temporarily then
-    local quickFunc = function()
-      if not g_game.isOnline() then return end
-      g_keyboard.unbindKeyDown("Enter", gameRootPanel)
-      g_keyboard.unbindKeyDown("Escape", gameRootPanel)
-      disableChat(temporarily)
-    end
-    g_keyboard.bindKeyDown("Enter", quickFunc, gameRootPanel)
-    g_keyboard.bindKeyDown("Escape", quickFunc, gameRootPanel)  
-  end
+  g_keyboard.unbindKeyUp("Space")
+  g_keyboard.unbindKeyUp("Enter")
 
-  modules.game_walking.disableWSAD()
+  gameInterface.unbindWalkKey("W")
+  gameInterface.unbindWalkKey("D")
+  gameInterface.unbindWalkKey("S")
+  gameInterface.unbindWalkKey("A")
 
   consoleToggleChat:setTooltip(tr("Disable chat mode, allow to walk using ASDW"))
 end
 
-function disableChat(temporarily)
-  if g_app.isMobile() then return end
-  if not consoleToggleChat:isChecked() then
-    return consoleToggleChat:setChecked(true)
-  end
-  if not temporarily then
-    modules.client_options.setOption("wsadWalking", true)
-  end
+function disableChat()
+  local gameInterface = modules.game_interface
 
   consoleTextEdit:setVisible(false)
   consoleTextEdit:setText("")
 
   local quickFunc = function()
-    if not g_game.isOnline() then return end
     if consoleToggleChat:isChecked() then
       consoleToggleChat:setChecked(false)
     end
-    enableChat(true)
+    enableChat()
   end
-  
-  local gameRootPanel = modules.game_interface.getRootPanel()
-  g_keyboard.bindKeyDown("Enter", quickFunc, gameRootPanel)
+  g_keyboard.bindKeyUp("Space", quickFunc)
+  g_keyboard.bindKeyUp("Enter", quickFunc)
 
-  modules.game_walking.enableWSAD()
+  gameInterface.bindWalkKey("W", North)
+  gameInterface.bindWalkKey("D", East)
+  gameInterface.bindWalkKey("S", South)
+  gameInterface.bindWalkKey("A", West)
 
   consoleToggleChat:setTooltip(tr("Enable chat mode"))
-end
-
-function isChatEnabled()
-  return consoleTextEdit:isVisible()
 end
 
 function terminate()
@@ -271,16 +269,14 @@ function terminate()
     onRuleViolationCancel = onRuleViolationCancel,
     onRuleViolationLock = onRuleViolationLock,
     onGameStart = online,
-    onGameEnd = offline,
-    onChannelEvent = onChannelEvent,
+    onGameEnd = offline
   })
 
   if g_game.isOnline() then clear() end
 
-  local gameRootPanel = modules.game_interface.getRootPanel()
-  g_keyboard.unbindKeyDown('Ctrl+O', gameRootPanel)
-  g_keyboard.unbindKeyDown('Ctrl+E', gameRootPanel)
-  g_keyboard.unbindKeyDown('Ctrl+H', gameRootPanel)
+  g_keyboard.unbindKeyDown('Ctrl+O')
+  g_keyboard.unbindKeyDown('Ctrl+E')
+  g_keyboard.unbindKeyDown('Ctrl+H')
 
   saveCommunicationSettings()
 
@@ -296,13 +292,7 @@ function terminate()
     violationWindow:destroy()
   end
 
-  consoleTabBar = nil
-  consoleContentPanel = nil
-  consoleToggleChat = nil
-  consoleTextEdit = nil
-
   consolePanel:destroy()
-  consolePanel = nil
   ownPrivateName = nil
 
   Console = nil
@@ -357,14 +347,11 @@ function clear()
   channels = {}
 
   consoleTabBar:removeTab(defaultTab)
-  defaultTab = nil
   consoleTabBar:removeTab(serverTab)
-  serverTab = nil
 
   local npcTab = consoleTabBar:getTab('NPCs')
   if npcTab then
     consoleTabBar:removeTab(npcTab)
-    npcTab = nil
   end
 
   if violationReportTab then
@@ -385,33 +372,6 @@ function clear()
   end
 end
 
-function switchMode(newView)
-  if newView then
-    consolePanel:setImageColor('#ffffff88')  
-  else
-    consolePanel:setImageColor('white')  
-  end
-  --consolePanel:setDraggable(floating)
-  --consoleTabBar:setDraggable(floating)
-  --floatingMode = floating
-end
-
-function onDragEnter(widget, pos)
-  return floatingMode
-end
-
-function onDragMove(widget, pos, moved)
-  if not floatingMode then
-    return
-  end
-  -- update margin
-  return true
-end
-
-function onDragLeave(widget, pos)
-  return floatingMode
-end
-
 function clearChannel(consoleTabBar)
   consoleTabBar:getCurrentTab().tabPanel:getChildById('consoleBuffer'):destroyChildren()
 end
@@ -423,7 +383,7 @@ end
 
 function openHelp()
   local helpChannel = 9
-  if g_game.getClientVersion() <= 810 then
+  if g_game.getProtocolVersion() <= 810 then
     helpChannel = 8
   end
   g_game.joinChannel(helpChannel)
@@ -485,10 +445,6 @@ function removeTab(tab)
     g_game.closeNpcChannel()
   end
 
-  if getCurrentTab() == tab then
-    consoleTabBar:selectTab(defaultTab)
-  end
-
   consoleTabBar:removeTab(tab)
 end
 
@@ -529,7 +485,7 @@ end
 
 function addPrivateChannel(receiver)
   channels[receiver] = receiver
-  return addTab(receiver, true)
+  return addTab(receiver, false)
 end
 
 function addPrivateText(text, speaktype, name, isPrivateCommand, creatureName)
@@ -558,6 +514,76 @@ function addText(text, speaktype, tabName, creatureName)
   local tab = getTab(tabName)
   if tab ~= nil then
     addTabText(text, speaktype, tab, creatureName)
+  end
+end
+function addText(text, speaktype, tabName, creatureName)
+  local tab = getTab(tabName)
+  local lootMsg = ""
+  local textLower = ""
+  local textColor = ""
+  local msgType = {}
+  local mobName = ""
+  local stringPos = 0
+  local numberPos = 0
+  local stackable = false
+  if tab ~= nil then
+      addTabText(text, speaktype, tab, creatureName)
+    if tabName == "Loot-Channel" then
+      textLower = string.sub(text, text:find(':')+1, text:len())
+      textLower = string.lower(textLower:trim())
+      local textLen = textLower:len()
+      for i = 1, #itemsToLoot do
+        stringPos = 0
+        stringPos = string.find(textLower, itemsToLoot[i].itemName)
+        if stringPos ~= nil then
+          local itemInfo = itemsToLoot[i].itemInfo
+          stackable = false
+          local itemCount = 0
+          local subString = ""
+          if textLower:find(',') == nil then
+            if stringPos > 1 then
+              stackable = true
+              itemCount = string.sub(textLower, 1, stringPos-1):trim()
+            end
+          else
+            subString = ""
+            subString = string.sub(textLower, 1, stringPos-1):trim()
+            local revString = subString:reverse()
+            local tempPos = revString:find(",")
+            if tempPos ~= nil and tempPos > 1 then
+              stackable = true
+              itemCount = string.sub(subString, -(tempPos) +1, subString:len()):trim()
+            else
+              --item's not stackable
+            end
+          end
+          if lootMsg:len() > 1 then
+            lootMsg = lootMsg .. ", "
+          end
+          if stackable then
+            lootMsg = lootMsg .. itemCount:trim() .. " " .. itemInfo
+          else
+            lootMsg = lootMsg .. itemInfo
+          end
+          if textColor:len() < 1 then
+            textColor = itemsToLoot[i].color
+          end
+        end
+      end
+      if lootMsg:len() > 1 then
+        -- add monster name and send to the player
+        mobName = string.sub(text, 0, text:find(':')-1)
+        lootMsg = mobName .. ": " .. lootMsg
+        lootMsg = lootMsg:trim()
+        msgType = {
+        color = textColor, 
+        consoleTab='Default',
+        screenTarget='highCenterLabel',   
+        consoleOption='showInfoMessagesInConsole' 
+        }
+        modules.game_textmessage.displayLootMessage(lootMsg, msgType)
+      end
+    end
   end
 end
 
@@ -593,29 +619,6 @@ function getHighlightedText(text)
   return tmpData
 end
 
-function getNewHighlightedText(text, color, highlightColor)
-  local tmpData = {}
-  
-  for i, part in ipairs(text:split("{")) do
-    if i == 1 then
-      table.insert(tmpData, part)
-      table.insert(tmpData, color)
-    else
-      for j, part2 in ipairs(part:split("}")) do
-        if j == 1 then
-          table.insert(tmpData, part2)
-          table.insert(tmpData, highlightColor)
-        else
-          table.insert(tmpData, part2)
-          table.insert(tmpData, color)
-        end
-      end
-    end
-  end
-
-  return tmpData
-end
-
 function addTabText(text, speaktype, tab, creatureName)
   if not tab or tab.locked or not text or #text == 0 then return end
 
@@ -625,119 +628,70 @@ function addTabText(text, speaktype, tab, creatureName)
 
   local panel = consoleTabBar:getTabPanel(tab)
   local consoleBuffer = panel:getChildById('consoleBuffer')
-
-  local label = nil
-  if consoleBuffer:getChildCount() > MAX_LINES then
-    label = consoleBuffer:getFirstChild()
-    consoleBuffer:moveChildToIndex(label, consoleBuffer:getChildCount())
-  end
-
-  if not label then
-    label = g_ui.createWidget('ConsoleLabel', consoleBuffer)
-  end
+  local label = g_ui.createWidget('ConsoleLabel', consoleBuffer)
   label:setId('consoleLabel' .. consoleBuffer:getChildCount())
   label:setText(text)
   label:setColor(speaktype.color)
   consoleTabBar:blinkTab(tab)
 
+  -- Overlay for consoleBuffer which shows highlighted words only
+
   if speaktype.npcChat and (g_game.getCharacterName() ~= creatureName or g_game.getCharacterName() == 'Account Manager') then
-    local highlightData = getNewHighlightedText(text, speaktype.color, "#1f9ffe")
-    if #highlightData > 2 then
-      label:setColoredText(highlightData)
+    local highlightData = getHighlightedText(text)
+    if #highlightData > 0 then
+      local labelHighlight = g_ui.createWidget('ConsolePhantomLabel', label)
+      labelHighlight:fill('parent')
+
+      labelHighlight:setId('consoleLabelHighlight' .. consoleBuffer:getChildCount())
+      labelHighlight:setColor("#1f9ffe")
+
+      -- Remove the curly braces
+      for i = 1, #highlightData / 3 do
+        local dataBlock = { _start = highlightData[(i-1)*3+1], _end = highlightData[(i-1)*3+2], words = highlightData[(i-1)*3+3] }
+        text = text:gsub("%{(.-)%}", dataBlock.words, 1)
+
+        -- Recalculate positions as braces are removed
+        highlightData[(i-1)*3+1] = dataBlock._start - ((i-1) * 2)
+        highlightData[(i-1)*3+2] = dataBlock._end - (1 + (i-1) * 2)
+      end
+      label:setText(text)
+
+      -- Calculate the positions of the highlighted text and fill with string.char(127) [Width: 1]
+      local drawText = label:getDrawText()
+      local tmpText = ""
+      for i = 1, #highlightData / 3 do
+        local dataBlock = { _start = highlightData[(i-1)*3+1], _end = highlightData[(i-1)*3+2], words = highlightData[(i-1)*3+3] }
+        local lastBlockEnd = (highlightData[(i-2)*3+2] or 1)
+
+        for letter = lastBlockEnd, dataBlock._start-1 do
+          local tmpChar = string.byte(drawText:sub(letter, letter))
+          local fillChar = (tmpChar == 10 or tmpChar == 32) and string.char(tmpChar) or string.char(127)
+
+          tmpText = tmpText .. string.rep(fillChar, letterWidth[tmpChar])
+        end
+        tmpText = tmpText .. dataBlock.words
+      end
+
+      -- Fill the highlight label to the same size as default label
+      local finalBlockEnd = (highlightData[(#highlightData/3-1)*3+2] or 1)
+      for letter = finalBlockEnd, drawText:len() do
+          local tmpChar = string.byte(drawText:sub(letter, letter))
+          local fillChar = (tmpChar == 10 or tmpChar == 32) and string.char(tmpChar) or string.char(127)
+
+          tmpText = tmpText .. string.rep(fillChar, letterWidth[tmpChar])
+      end
+
+      labelHighlight:setText(tmpText)
     end
   end
 
   label.name = creatureName
-  consoleBuffer.onMouseRelease = function(self, mousePos, mouseButton)
-    processMessageMenu(mousePos, mouseButton, nil, nil, nil, tab)
-  end
-  label.onMouseRelease = function(self, mousePos, mouseButton)
+  label.onMouseRelease = function (self, mousePos, mouseButton)
     processMessageMenu(mousePos, mouseButton, creatureName, text, self, tab)
   end
-  label.onMousePress = function(self, mousePos, button)
-    if button == MouseLeftButton then clearSelection(consoleBuffer) end
-  end
-  label.onDragEnter = function(self, mousePos)
-    clearSelection(consoleBuffer)
-    return true
-  end
-  label.onDragLeave = function(self, droppedWidget, mousePos)
-    local text = {}
-    for selectionChild = consoleBuffer.selection.first, consoleBuffer.selection.last do
-      local label = self:getParent():getChildByIndex(selectionChild)
-      table.insert(text, label:getSelection())
-    end
-    consoleBuffer.selectionText = table.concat(text, '\n')
-    return true
-  end
-  label.onDragMove = function(self, mousePos, mouseMoved)
-    local parent = self:getParent()
-    local parentRect = parent:getPaddingRect()
-    local selfIndex = parent:getChildIndex(self)
-    local child = parent:getChildByPos(mousePos)
 
-    -- find bonding children
-    if not child then
-      if mousePos.y < self:getY() then
-        for index = selfIndex - 1, 1, -1 do
-          local label = parent:getChildByIndex(index)
-          if label:getY() + label:getHeight() > parentRect.y then
-            if (mousePos.y >= label:getY() and mousePos.y <= label:getY() + label:getHeight()) or index == 1 then
-              child = label
-              break
-            end
-          else
-            child = parent:getChildByIndex(index + 1)
-            break
-          end
-        end
-      elseif mousePos.y > self:getY() + self:getHeight() then
-        for index = selfIndex + 1, parent:getChildCount(), 1 do
-          local label = parent:getChildByIndex(index)
-          if label:getY() < parentRect.y + parentRect.height then
-            if (mousePos.y >= label:getY() and mousePos.y <= label:getY() + label:getHeight()) or index == parent:getChildCount() then
-              child = label
-              break
-            end
-          else
-            child = parent:getChildByIndex(index - 1)
-            break
-          end
-        end
-      else
-        child = self
-      end
-    end
-
-    if not child then return false end
-
-    local childIndex = parent:getChildIndex(child)
-
-    -- remove old selection
-    clearSelection(consoleBuffer)
-
-    -- update self selection
-    local textBegin = self:getTextPos(self:getLastClickPosition())
-    local textPos = self:getTextPos(mousePos)
-    self:setSelection(textBegin, textPos)
-
-    consoleBuffer.selection = { first = math.min(selfIndex, childIndex), last = math.max(selfIndex, childIndex) }
-
-    -- update siblings selection
-    if child ~= self then
-      for selectionChild = consoleBuffer.selection.first + 1, consoleBuffer.selection.last - 1 do
-        parent:getChildByIndex(selectionChild):selectAll()
-      end
-
-      local textPos = child:getTextPos(mousePos)
-      if childIndex > selfIndex then
-        child:setSelection(0, textPos)
-      else
-        child:setSelection(string.len(child:getText()), textPos)
-      end
-    end
-
-    return true
+  if consoleBuffer:getChildCount() > MAX_LINES then
+    consoleBuffer:getFirstChild():destroy()
   end
 end
 
@@ -753,10 +707,7 @@ end
 
 function processChannelTabMenu(tab, mousePos, mouseButton)
   local menu = g_ui.createWidget('PopupMenu')
-  menu:setGameMenu(true)
 
-  local worldName = g_game.getWorldName()
-  local characterName = g_game.getCharacterName()
   channelName = tab:getText()
   if tab ~= defaultTab and tab ~= serverTab then
     menu:addOption(tr('Close'), function() removeTab(channelName) end)
@@ -766,28 +717,8 @@ function processChannelTabMenu(tab, mousePos, mouseButton)
 
   if consoleTabBar:getCurrentTab() == tab then
     menu:addOption(tr('Clear Messages'), function() clearChannel(consoleTabBar) end)
-    menu:addOption(tr('Save Messages'), function()
-      local panel = consoleTabBar:getTabPanel(tab)
-      local consoleBuffer = panel:getChildById('consoleBuffer')
-      local lines = {}
-      for _,label in pairs(consoleBuffer:getChildren()) do
-        table.insert(lines, label:getText())
-      end
-
-      local filename = worldName .. ' - ' .. characterName .. ' - ' .. channelName .. '.txt'
-      local filepath = '/user_dir/' .. filename
-
-      -- extra information at the beginning
-      table.insert(lines, 1, os.date('\nChannel saved at %a %b %d %H:%M:%S %Y'))
-
-      if g_resources.fileExists(filepath) then
-        table.insert(lines, 1, protectedcall(g_resources.readFileContents, filepath) or '')
-      end
-
-      g_resources.writeFileContents(filepath, table.concat(lines, '\n'))
-      modules.game_textmessage.displayStatusMessage(tr('Channel appended to %s', filename))
-    end)
   end
+  --menu:addOption(tr('Save Messages'), function() --[[TODO]] end)
 
   menu:display(mousePos)
 end
@@ -795,7 +726,6 @@ end
 function processMessageMenu(mousePos, mouseButton, creatureName, text, label, tab)
   if mouseButton == MouseRightButton then
     local menu = g_ui.createWidget('PopupMenu')
-    menu:setGameMenu(true)
     if creatureName and #creatureName > 0 then
       if creatureName ~= g_game.getCharacterName() then
         menu:addOption(tr('Message to ' .. creatureName), function () g_game.openPrivateChannel(creatureName) end)
@@ -821,15 +751,12 @@ function processMessageMenu(mousePos, mouseButton, creatureName, text, label, ta
 
       menu:addOption(tr('Copy name'), function () g_window.setClipboardText(creatureName) end)
     end
-    local selection = tab.tabPanel:getChildById('consoleBuffer').selectionText
-    if selection and #selection > 0 then
-      menu:addOption(tr('Copy'), function() g_window.setClipboardText(selection) end, '(Ctrl+C)')
+    if label:hasSelection() then
+      menu:addOption(tr('Copy'), function() g_window.setClipboardText(label:getSelection()) end, '(Ctrl+C)')
     end
-    if text then
-      menu:addOption(tr('Copy message'), function() g_window.setClipboardText(text) end)
-    end
-    menu:addOption(tr('Select all'), function() selectAll(tab.tabPanel:getChildById('consoleBuffer')) end)
-    if tab.violations and creatureName then
+    menu:addOption(tr('Copy message'), function() g_window.setClipboardText(text) end)
+    menu:addOption(tr('Select all'), function() label:selectAll() end)
+    if tab.violations then
       menu:addSeparator()
       menu:addOption(tr('Process') .. ' ' .. creatureName, function() processViolation(creatureName, text) end)
       menu:addOption(tr('Remove') .. ' ' .. creatureName, function() g_game.closeRuleViolation(creatureName) end)
@@ -841,7 +768,6 @@ end
 function sendCurrentMessage()
   local message = consoleTextEdit:getText()
   if #message == 0 then return end
-  if not isChatEnabled() then return end
   consoleTextEdit:clearText()
 
   -- send message
@@ -882,7 +808,7 @@ function sendMessage(message, tab)
   local chatCommandMessage
 
   -- player used yell command
-  chatCommandMessage = message:match("^%#[y|Y] (.*)")
+  chatCommandMessage = message:match("^%#y (.*)")
   if chatCommandMessage ~= nil then
     chatCommandSayMode = 'yell'
     channel = 0
@@ -890,7 +816,7 @@ function sendMessage(message, tab)
   end
 
    -- player used whisper
-  chatCommandMessage = message:match("^%#[w|W] (.*)")
+  local chatCommandMessage = message:match("^%#w (.*)")
   if chatCommandMessage ~= nil then
     chatCommandSayMode = 'whisper'
     message = chatCommandMessage
@@ -898,24 +824,9 @@ function sendMessage(message, tab)
   end
 
   -- player say
-  chatCommandMessage = message:match("^%#[s|S] (.*)")
+  local chatCommandMessage = message:match("^%#s (.*)")
   if chatCommandMessage ~= nil then
     chatCommandSayMode = 'say'
-    message = chatCommandMessage
-    channel = 0
-  end
-
-  -- player red talk on channel
-  chatCommandMessage = message:match("^%#[c|C] (.*)")
-  if chatCommandMessage ~= nil then
-    chatCommandSayMode = 'channelRed'
-    message = chatCommandMessage
-  end
-
-  -- player broadcast
-  chatCommandMessage = message:match("^%#[b|B] (.*)")
-  if chatCommandMessage ~= nil then
-    chatCommandSayMode = 'broadcast'
     message = chatCommandMessage
     channel = 0
   end
@@ -959,7 +870,6 @@ function sendMessage(message, tab)
     local isPrivateCommand = false
     local priv = true
     local tabname = name
-    local dontAdd = false
     if chatCommandPrivateReady then
       speaktypedesc = 'privatePlayerToPlayer'
       name = chatCommandPrivate
@@ -969,11 +879,10 @@ function sendMessage(message, tab)
     elseif tab == violationReportTab then
       if violationReportTab.locked then
         modules.game_textmessage.displayFailureMessage('Wait for a gamemaster reply.')
-        dontAdd = true
-      else
-        speaktypedesc = 'rvrContinue'
-        tabname = tr('Report Rule') .. '...'
+        return
       end
+      speaktypedesc = 'rvrContinue'
+      tabname = tr('Report Rule') .. '...'
     elseif tab.violationChatName then
       speaktypedesc = 'rvrAnswerTo'
       name = tab.violationChatName
@@ -986,10 +895,9 @@ function sendMessage(message, tab)
     local speaktype = SpeakTypesSettings[speaktypedesc]
     local player = g_game.getLocalPlayer()
     g_game.talkPrivate(speaktype.speakType, name, message)
-    if not dontAdd then
-      message = applyMessagePrefixies(g_game.getCharacterName(), player:getLevel(), message)
-      addPrivateText(message, speaktype, tabname, isPrivateCommand, g_game.getCharacterName())
-    end
+
+    message = applyMessagePrefixies(g_game.getCharacterName(), player:getLevel(), message)
+    addPrivateText(message, speaktype, tabname, isPrivateCommand, g_game.getCharacterName())
   end
 end
 
@@ -1015,10 +923,6 @@ function setIgnoreNpcMessages(ignore)
 end
 
 function navigateMessageHistory(step)
-  if not isChatEnabled() then
-    return
-  end
-
   local numCommands = #messageHistory
   if numCommands > 0 then
     currentMessageIndex = math.min(math.max(currentMessageIndex + step, 0), numCommands)
@@ -1029,14 +933,10 @@ function navigateMessageHistory(step)
       consoleTextEdit:clearText()
     end
   end
-  local player = g_game.getLocalPlayer()
-  if player then
-    player:lockWalk(200) -- lock walk for 200 ms to avoid walk during release of shift
-  end
 end
 
 function applyMessagePrefixies(name, level, message)
-  if name and #name > 0 then
+  if name then
     if modules.client_options.getOption('showLevelsInConsole') and level > 0 then
       message = name .. ' [' .. level .. ']: ' .. message
     else
@@ -1052,11 +952,15 @@ function onTalk(name, level, mode, message, channelId, creaturePos)
     return
   end
 
-  local isNpcMode = (mode == MessageModes.NpcFromStartBlock or mode == MessageModes.NpcFrom)
-
-  if ignoreNpcMessages and isNpcMode then return end
+  if ignoreNpcMessages and mode == MessageModes.NpcFrom then return end
 
   speaktype = SpeakTypes[mode]
+  if ((mode == MessageModes.Yell and isIgnoringYelling()) or
+        (speaktype.private and isIgnoringPrivate() and mode ~= MessageModes.NpcFrom) or
+            (isIgnored(name) or isIgnored(name:lower()))) and
+                name ~= g_game.getLocalPlayer():getName() then
+    return
+  end
 
   if not speaktype then
     perror('unhandled onTalk message mode ' .. mode .. ': ' .. message)
@@ -1070,7 +974,7 @@ function onTalk(name, level, mode, message, channelId, creaturePos)
 
     if mode == MessageModes.Yell and isIgnoringYelling() then
       return
-    elseif speaktype.private and isIgnoringPrivate() and not isNpcMode then
+    elseif speaktype.private and isIgnoringPrivate() and mode ~= MessageModes.NpcFrom then
       return
     elseif isIgnored(name) then
       return
@@ -1083,22 +987,22 @@ function onTalk(name, level, mode, message, channelId, creaturePos)
 
   if (mode == MessageModes.Say or mode == MessageModes.Whisper or mode == MessageModes.Yell or
       mode == MessageModes.Spell or mode == MessageModes.MonsterSay or mode == MessageModes.MonsterYell or
-      mode == MessageModes.NpcFrom or mode == MessageModes.BarkLow or mode == MessageModes.BarkLoud or
-      mode == MessageModes.NpcFromStartBlock) and creaturePos then
-    local staticText = StaticText.create()
-    -- Remove curly braces from screen message
-    local staticMessage = message
-    if isNpcMode then
-      local highlightData = getNewHighlightedText(staticMessage, speaktype.color, "#1f9ffe")
-      if #highlightData > 2 then
-        staticText:addColoredMessage(name, mode, highlightData)
-      else
-        staticText:addMessage(name, mode, staticMessage)
+      mode == MessageModes.NpcFrom or mode == MessageModes.BarkLow or mode == MessageModes.BarkLoud) and
+     creaturePos then
+      -- Remove curly braces from screen message
+      local staticMessage = message
+      if mode == MessageModes.NpcFrom then
+        local highlightData = getHighlightedText(staticMessage)
+        if #highlightData > 0 then
+          for i = 1, #highlightData / 3 do
+            local dataBlock = { _start = highlightData[(i-1)*3+1], _end = highlightData[(i-1)*3+2], words = highlightData[(i-1)*3+3] }
+            staticMessage = staticMessage:gsub("{"..dataBlock.words.."}", dataBlock.words)
+          end
+        end
       end
-      staticText:setColor(speaktype.color)
-    else
-      staticText:addMessage(name, mode, staticMessage)
-    end
+
+    local staticText = StaticText.create()
+    staticText:addMessage(name, mode, staticMessage)
     g_map.addThing(staticText, creaturePos, -1)
   end
 
@@ -1214,7 +1118,6 @@ function doChannelListSubmit()
     if selectedChannelLabel.channelId == 0xFFFF then
       g_game.openOwnChannel()
     else
-      g_game.leaveChannel(selectedChannelLabel.channelId)
       g_game.joinChannel(selectedChannelLabel.channelId)
     end
   end
@@ -1252,15 +1155,15 @@ function loadCommunicationSettings()
 
   local ignoreNode = g_settings.getNode('IgnorePlayers')
   if ignoreNode then
-    for _, player in pairs(ignoreNode) do
-      table.insert(communicationSettings.ignoredPlayers, player)
+    for i = 1, #ignoreNode do
+      table.insert(communicationSettings.ignoredPlayers, ignoreNode[i])
     end
   end
 
   local whitelistNode = g_settings.getNode('WhitelistedPlayers')
   if whitelistNode then
-    for _, player in pairs(whitelistNode) do
-      table.insert(communicationSettings.whitelistedPlayers, player)
+    for i = 1, #whitelistNode do
+      table.insert(communicationSettings.whitelistedPlayers, whitelistNode[i])
     end
   end
 
@@ -1314,7 +1217,6 @@ end
 function addIgnoredPlayer(name)
   if isIgnored(name) then return end
   table.insert(communicationSettings.ignoredPlayers, name)
-  communicationSettings.useIgnoreList = true
 end
 
 function removeIgnoredPlayer(name)
@@ -1469,15 +1371,8 @@ function online()
   defaultTab = addTab(tr('Default'), true)
   serverTab = addTab(tr('Server Log'), false)
 
-
-  if g_game.getClientVersion() >= 820 then
-    local tab = addTab("NPCs", false)
-    tab.npcChat = true
-  end
-  
-  if g_game.getClientVersion() < 862 then
-    local gameRootPanel = modules.game_interface.getRootPanel()
-    g_keyboard.bindKeyDown('Ctrl+R', openPlayerReportRuleViolationWindow, gameRootPanel)
+  if g_game.getProtocolVersion() < 862 then
+    g_keyboard.bindKeyDown('Ctrl+R', openPlayerReportRuleViolationWindow)
   end
   -- open last channels
   local lastChannelsOpen = g_settings.getNode('lastChannelsOpen')
@@ -1495,30 +1390,12 @@ function online()
       end
     end
   end
-  scheduleEvent(function() consoleTabBar:selectTab(defaultTab) end, 500)
   scheduleEvent(function() ignoredChannels = {} end, 3000)
 end
 
 function offline()
-  if g_game.getClientVersion() < 862 then
-    local gameRootPanel = modules.game_interface.getRootPanel()
-    g_keyboard.unbindKeyDown('Ctrl+R', gameRootPanel)
+  if g_game.getProtocolVersion() < 862 then
+    g_keyboard.unbindKeyDown('Ctrl+R')
   end
   clear()
-end
-
-function onChannelEvent(channelId, name, type)
-  local fmt = ChannelEventFormats[type]
-  if not fmt then
-    print(('Unknown channel event type (%d).'):format(type))
-    return
-  end
-
-  local channel = channels[channelId]
-  if channel then
-    local tab = getTab(channel)
-    if tab then
-      addTabText(fmt:format(name), SpeakTypesSettings.channelOrange, tab)
-    end
-  end
 end

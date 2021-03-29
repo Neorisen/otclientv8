@@ -2,7 +2,7 @@ Module
   name: client_topmenu
   description: Create the top menu
   author: edubart
-  website: https://github.com/edubart/otclient
+  website: www.otclient.info
   scripts: [ topmenu ]
   sandboxed: true
   @onLoad: init()
